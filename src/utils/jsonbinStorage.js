@@ -331,7 +331,15 @@ export const getContentFromCloud = async () => {
 // Save content settings to cloud
 export const saveContentToCloud = async (activeContent) => {
   try {
-    const binId = localStorage.getItem(CONTENT_BIN_ID_KEY)
+    // Cek config (hardcoded) dulu, lalu localStorage
+    const configBinIds = getConfigBinIds()
+    let binId = configBinIds.contentBinId || localStorage.getItem(CONTENT_BIN_ID_KEY)
+    
+    // Simpan ke localStorage untuk konsistensi
+    if (configBinIds.contentBinId && !localStorage.getItem(CONTENT_BIN_ID_KEY)) {
+      localStorage.setItem(CONTENT_BIN_ID_KEY, configBinIds.contentBinId)
+    }
+    
     const apiKey = getApiKey()
     
     if (!binId || !apiKey) {
