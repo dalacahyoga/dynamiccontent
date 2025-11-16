@@ -1,11 +1,11 @@
 // JSONBin.io Configuration
-// API Key FORCE - semua device OTOMATIS menggunakan ini, tidak perlu setup manual
+// API Key FORCE - semua device OTOMATIS menggunakan ini
 export const JSONBIN_API_KEY = '$2a$10$KJMZHD2T9JURi3VYxeY.MOEM3jU2qB7nGl3yH5EU2Cqgh0XN5fy2.'
 
-// Master Config Bin ID - Bin khusus untuk menyimpan config bin ID
-// Semua device akan otomatis menggunakan bin dengan nama ini
-// Setelah Device A setup, bin ini akan otomatis dibuat dan digunakan oleh semua device
-export const MASTER_CONFIG_BIN_NAME = 'Portal Indonesia - Master Config'
+// Bin IDs - Setelah Device A setup, copy bin IDs dari dashboard dan paste di sini
+// Semua device akan otomatis menggunakan bin IDs yang sama
+export const JSONBIN_LOGS_BIN_ID = null // Paste logs bin ID di sini setelah Device A setup
+export const JSONBIN_CONTENT_BIN_ID = null // Paste content bin ID di sini setelah Device A setup
 
 // Check if API key is available
 export const hasApiKey = () => {
@@ -14,24 +14,18 @@ export const hasApiKey = () => {
 
 // Get API key (from config or localStorage)
 export const getConfigApiKey = () => {
-  // First try environment variable / config
   if (JSONBIN_API_KEY) {
     return JSONBIN_API_KEY
   }
-  
-  // Fallback to localStorage (for backward compatibility)
   return localStorage.getItem('jsonbinApiKey')
 }
 
-// Get config bin ID (from config or localStorage)
-export const getConfigBinId = () => {
-  // First try config
-  if (JSONBIN_CONFIG_BIN_ID) {
-    return JSONBIN_CONFIG_BIN_ID
+// Get bin IDs (from config first, then localStorage)
+export const getConfigBinIds = () => {
+  return {
+    logsBinId: JSONBIN_LOGS_BIN_ID || localStorage.getItem('jsonbinBinId'),
+    contentBinId: JSONBIN_CONTENT_BIN_ID || localStorage.getItem('jsonbinContentBinId')
   }
-  
-  // Fallback to localStorage
-  return localStorage.getItem('jsonbinConfigBinId')
 }
 
 

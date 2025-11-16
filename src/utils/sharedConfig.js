@@ -5,19 +5,13 @@
 const SHARED_CONFIG_KEY = 'sharedJsonbinConfig'
 
 // Save shared config (API key and bin IDs) to localStorage
-// This can be called after admin setup to share config with all devices
-export const saveSharedConfig = (apiKey, logsBinId, contentBinId, masterBinId = null) => {
+export const saveSharedConfig = (apiKey, logsBinId, contentBinId) => {
   try {
     const config = {
       apiKey,
       logsBinId,
       contentBinId,
       timestamp: Date.now()
-    }
-    
-    // Tambahkan master bin ID jika ada
-    if (masterBinId) {
-      config.masterBinId = masterBinId
     }
     
     localStorage.setItem(SHARED_CONFIG_KEY, JSON.stringify(config))
@@ -31,9 +25,6 @@ export const saveSharedConfig = (apiKey, logsBinId, contentBinId, masterBinId = 
     }
     if (contentBinId) {
       localStorage.setItem('jsonbinContentBinId', contentBinId)
-    }
-    if (masterBinId) {
-      localStorage.setItem('jsonbinConfigBinId', masterBinId)
     }
     
     return true
@@ -63,9 +54,6 @@ export const loadSharedConfig = () => {
     if (config.contentBinId) {
       localStorage.setItem('jsonbinContentBinId', config.contentBinId)
     }
-    if (config.masterBinId) {
-      localStorage.setItem('jsonbinConfigBinId', config.masterBinId)
-    }
     
     return config
   } catch (error) {
@@ -75,19 +63,7 @@ export const loadSharedConfig = () => {
 }
 
 // Auto-load shared config on page load
-// This allows device B to automatically get config if it was set by device A
 export const autoLoadSharedConfig = () => {
-  try {
-    const config = loadSharedConfig()
-    if (config && config.masterBinId) {
-      // Set master bin ID ke localStorage agar Device B bisa pakai
-      localStorage.setItem('jsonbinConfigBinId', config.masterBinId)
-      console.log('✅ Master config bin ID loaded from shared config:', config.masterBinId)
-    }
-    return config
-  } catch (error) {
-    console.error('Error auto-loading shared config:', error)
-    return null
-  }
+  return loadSharedConfig()
 }
 

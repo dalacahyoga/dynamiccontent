@@ -178,18 +178,23 @@ function Dashboard() {
       const contentBinId = await initializeContentBin(apiKey)
       setJsonbinInitialized(true)
       
-      // Get master config bin ID
-      const masterBinId = localStorage.getItem('jsonbinConfigBinId')
-      
-      // Save shared config dengan master bin ID agar Device B, C bisa pakai
-      saveSharedConfig(apiKey, logsBinId, contentBinId, masterBinId)
+      // Save shared config
+      saveSharedConfig(apiKey, logsBinId, contentBinId)
       
       // Save current content to cloud immediately after setup
       const currentContent = getActiveContent()
       const { saveContentToCloud } = await import('../../utils/jsonbinStorage')
       await saveContentToCloud(currentContent)
       
-      alert('✅ JSONBin.io berhasil di-setup!\n\n📋 Master Config Bin ID: ' + (masterBinId || 'N/A') + '\n\nSemua device (B, C, dst) akan OTOMATIS menggunakan bins yang sama jika master bin ID sudah di-share.')
+      // Tampilkan bin IDs untuk di-copy dan hardcode
+      const binIdsText = `export const JSONBIN_LOGS_BIN_ID = "${logsBinId}"
+export const JSONBIN_CONTENT_BIN_ID = "${contentBinId}"`
+      
+      navigator.clipboard.writeText(binIdsText).then(() => {
+        alert('✅ JSONBin.io berhasil di-setup!\n\n📋 Bin IDs sudah di-copy ke clipboard.\n\nPaste di src/config/jsonbin.js agar semua device menggunakan bins yang sama.')
+      }).catch(() => {
+        alert('✅ JSONBin.io berhasil di-setup!\n\n📋 Copy bin IDs ini:\n\nLogs Bin ID: ' + logsBinId + '\nContent Bin ID: ' + contentBinId + '\n\nPaste di src/config/jsonbin.js')
+      })
       // Auto load logs after setup
       await loadLogsFromCloud()
       // Sync content from cloud
@@ -410,17 +415,37 @@ function Dashboard() {
                       <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
                         <span className="bin-id">Logs Bin ID: {getBinId()}</span>
                         <span className="bin-id">Content Bin ID: {localStorage.getItem('jsonbinContentBinId') || 'N/A'}</span>
-                        <span className="bin-id">Master Config Bin ID: {localStorage.getItem('jsonbinConfigBinId') || 'N/A'}</span>
+                        <button
+                          onClick={() => {
+                            const logsBinId = getBinId()
+                            const contentBinId = localStorage.getItem('jsonbinContentBinId')
+                            const text = `export const JSONBIN_LOGS_BIN_ID = "${logsBinId}"
+export const JSONBIN_CONTENT_BIN_ID = "${contentBinId}"`
+                            navigator.clipboard.writeText(text)
+                            alert('Bin IDs copied! Paste di src/config/jsonbin.js')
+                          }}
+                          style={{
+                            marginTop: '0.5rem',
+                            padding: '0.4rem 0.8rem',
+                            background: '#3b82f6',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '0.85rem'
+                          }}
+                        >
+                          📋 Copy Bin IDs untuk Hardcode
+                        </button>
                         <div style={{ 
                           marginTop: '0.5rem', 
                           padding: '0.8rem', 
-                          background: '#f0f9ff', 
+                          background: '#fef3c7', 
                           borderRadius: '6px',
                           fontSize: '0.85rem',
-                          color: '#0369a1'
+                          color: '#92400e'
                         }}>
-                          <strong>✅ Auto-Setup Aktif:</strong> Master Config Bin ID sudah tersimpan di shared config. 
-                          Device B, C, dst akan otomatis menggunakan bins yang sama saat akses website.
+                          <strong>⚠️ PENTING:</strong> Setelah copy bin IDs, paste di src/config/jsonbin.js agar semua device menggunakan bins yang sama.
                         </div>
                       </div>
                     </div>
