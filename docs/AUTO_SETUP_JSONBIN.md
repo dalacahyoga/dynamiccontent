@@ -6,9 +6,21 @@ Membuat sistem dimana **hanya Device A (admin) yang perlu setup API key**, dan *
 
 ## ✅ Solusi yang Sudah Diimplementasikan
 
-Sistem ini sudah mendukung **auto-setup** untuk device B, C, dst dengan 2 cara:
+Sistem ini sudah mendukung **auto-setup** untuk device B, C, dst dengan **API key yang di-hardcode** di `src/config/jsonbin.js`.
 
-### Cara 1: Environment Variable (Recommended untuk Production)
+### ✅ Hardcode API Key (Sudah Aktif)
+
+API key sudah di-hardcode di `src/config/jsonbin.js`:
+```javascript
+const HARDCODED_API_KEY = '$2a$10$KJMZHD2T9JURi3VYxeY.MOEM3jU2qB7nGl3yH5EU2Cqgh0XN5fy2.'
+```
+
+**Cara Kerja:**
+- Device A (admin) setup JSONBin.io sekali → bins dibuat
+- **Setelah Device A setup:** Copy bin IDs dari dashboard, lalu hardcode di `src/config/jsonbin.js` (lihat langkah di bawah)
+- Device B, C, dst akses website → **otomatis detect API key dari config** → **otomatis menggunakan bins yang sama** → **tidak perlu setup manual!**
+
+### Alternatif: Environment Variable (Opsional)
 
 1. **Setup di Netlify:**
    - Login ke Netlify dashboard
@@ -38,14 +50,22 @@ const HARDCODED_API_KEY = '$2a$10$KJMZHD2T9JURi3VYxeY.MOEM3jU2qB7nGl3yH5EU2Cqgh0
 ## 🔄 Cara Kerja
 
 1. **Device A (Admin):**
-   - Login ke admin panel
-   - Setup JSONBin.io dengan API key
+   - Login ke admin panel di production
+   - Setup JSONBin.io dengan API key (bisa pakai API key yang sama atau biarkan auto-detect dari config)
    - Bins akan dibuat (logs bin & content bin)
+   - **Catatan:** Setelah setup, semua device akan menggunakan bins yang sama
 
-2. **Device B, C, dst (Pengunjung):**
+2. **Setelah Device A Setup (PENTING):**
+   - Di dashboard admin, klik tombol **"📋 Copy Bin IDs untuk Hardcode"**
+   - Buka file `src/config/jsonbin.js`
+   - Paste bin IDs ke `HARDCODED_LOGS_BIN_ID` dan `HARDCODED_CONTENT_BIN_ID`
+   - Commit dan push ke GitHub → Netlify akan auto-deploy
+   - Setelah deploy, semua device akan menggunakan bins yang sama
+
+3. **Device B, C, dst (Pengunjung):**
    - Akses website
-   - Sistem otomatis detect API key dari environment variable atau config
-   - Otomatis initialize bins (jika belum ada)
+   - Sistem otomatis detect API key dari config (hardcoded)
+   - Otomatis menggunakan bins yang sama dengan device A (jika bin IDs sudah di-hardcode)
    - Otomatis sync log dan konten dari cloud
    - **Tidak perlu setup manual!**
 

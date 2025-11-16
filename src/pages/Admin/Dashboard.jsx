@@ -406,10 +406,9 @@ function Dashboard() {
                           onClick={() => {
                             const logsBinId = getBinId()
                             const contentBinId = localStorage.getItem('jsonbinContentBinId')
-                            const apiKey = getApiKey()
-                            const text = `VITE_JSONBIN_API_KEY=${apiKey}\nVITE_JSONBIN_LOGS_BIN_ID=${logsBinId}\nVITE_JSONBIN_CONTENT_BIN_ID=${contentBinId}`
+                            const text = `Logs Bin ID: ${logsBinId}\nContent Bin ID: ${contentBinId}\n\nCopy bin IDs ini dan hardcode di src/config/jsonbin.js agar semua device menggunakan bins yang sama.`
                             navigator.clipboard.writeText(text)
-                            alert('Environment variables copied! Paste di Netlify Environment Variables.')
+                            alert('Bin IDs copied! Paste di src/config/jsonbin.js untuk hardcode bin IDs.')
                           }}
                           style={{
                             marginTop: '0.5rem',
@@ -422,7 +421,7 @@ function Dashboard() {
                             fontSize: '0.85rem'
                           }}
                         >
-                          📋 Copy Env Vars untuk Device Lain
+                          📋 Copy Bin IDs untuk Hardcode
                         </button>
                       </div>
                     </div>
