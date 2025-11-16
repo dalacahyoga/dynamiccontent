@@ -81,8 +81,19 @@ export const getApiKey = () => {
   return localStorage.getItem(JSONBIN_API_KEY_KEY)
 }
 
-// Get bin ID from storage
+// Get bin ID from storage or config
 export const getBinId = () => {
+  // Cek config (hardcoded) dulu
+  const configBinIds = getConfigBinIds()
+  if (configBinIds.logsBinId) {
+    // Simpan ke localStorage untuk konsistensi
+    if (!localStorage.getItem(JSONBIN_BIN_ID_KEY)) {
+      localStorage.setItem(JSONBIN_BIN_ID_KEY, configBinIds.logsBinId)
+    }
+    return configBinIds.logsBinId
+  }
+  
+  // Fallback ke localStorage
   return localStorage.getItem(JSONBIN_BIN_ID_KEY)
 }
 
@@ -256,7 +267,15 @@ export const initializeContentBin = async (apiKey = null) => {
 // Try to read without API key first (if bin is public), then with API key if available
 export const getContentFromCloud = async () => {
   try {
-    const binId = localStorage.getItem(CONTENT_BIN_ID_KEY)
+    // Cek config (hardcoded) dulu, lalu localStorage
+    const configBinIds = getConfigBinIds()
+    let binId = configBinIds.contentBinId || localStorage.getItem(CONTENT_BIN_ID_KEY)
+    
+    // Simpan ke localStorage untuk konsistensi
+    if (configBinIds.contentBinId && !localStorage.getItem(CONTENT_BIN_ID_KEY)) {
+      localStorage.setItem(CONTENT_BIN_ID_KEY, configBinIds.contentBinId)
+    }
+    
     const apiKey = getApiKey()
     
     if (!binId) {
