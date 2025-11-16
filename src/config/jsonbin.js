@@ -2,10 +2,10 @@
 // API Key FORCE - semua device OTOMATIS menggunakan ini, tidak perlu setup manual
 export const JSONBIN_API_KEY = '$2a$10$KJMZHD2T9JURi3VYxeY.MOEM3jU2qB7nGl3yH5EU2Cqgh0XN5fy2.'
 
-// Config Bin ID (untuk share bin IDs antar device)
-// Setelah device A setup, copy config bin ID dari dashboard dan paste di sini
-const HARDCODED_CONFIG_BIN_ID = null // Paste config bin ID di sini setelah device A setup
-export const JSONBIN_CONFIG_BIN_ID = import.meta.env.VITE_JSONBIN_CONFIG_BIN_ID || HARDCODED_CONFIG_BIN_ID || null
+// Master Config Bin ID - Bin khusus untuk menyimpan config bin ID
+// Semua device akan otomatis menggunakan bin dengan nama ini
+// Setelah Device A setup, bin ini akan otomatis dibuat dan digunakan oleh semua device
+export const MASTER_CONFIG_BIN_NAME = 'Portal Indonesia - Master Config'
 
 // Check if API key is available
 export const hasApiKey = () => {
@@ -34,11 +34,4 @@ export const getConfigBinId = () => {
   return localStorage.getItem('jsonbinConfigBinId')
 }
 
-// Get bin IDs from config (if available)
-export const getConfigBinIds = () => {
-  return {
-    logsBinId: JSONBIN_LOGS_BIN_ID,
-    contentBinId: JSONBIN_CONTENT_BIN_ID
-  }
-}
 

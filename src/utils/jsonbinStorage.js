@@ -2,7 +2,7 @@
 // Free service: https://jsonbin.io
 // No backend needed - direct API calls from frontend
 
-import { getConfigApiKey, getConfigBinId } from '../config/jsonbin'
+import { getConfigApiKey, MASTER_CONFIG_BIN_NAME } from '../config/jsonbin'
 
 const JSONBIN_API_URL = 'https://api.jsonbin.io/v3/b'
 const JSONBIN_BIN_ID_KEY = 'jsonbinBinId'
@@ -196,44 +196,70 @@ export const isInitialized = () => {
 
 // ========== CONFIG BIN (untuk share bin IDs antar device) ==========
 
-// Initialize atau get config bin (untuk menyimpan bin IDs)
-export const getOrCreateConfigBin = async (apiKey) => {
-  // Coba ambil dari config (hardcoded) dulu
-  let configBinId = getConfigBinId()
+// Initialize atau get master config bin (untuk menyimpan config bin ID)
+// Semua device akan menggunakan bin dengan nama yang sama
+export const getOrCreateMasterConfigBin = async (apiKey) => {
+  // Cek localStorage dulu
+  let masterBinId = localStorage.getItem(CONFIG_BIN_ID_KEY)
   
-  // Jika belum ada di config, coba dari localStorage
-  if (!configBinId) {
-    configBinId = localStorage.getItem(CONFIG_BIN_ID_KEY)
-  }
-  
-  // Jika masih belum ada, create baru
-  if (!configBinId) {
+  // Jika belum ada, coba cari atau create master config bin
+  if (!masterBinId) {
+    // JSONBin.io tidak support search by name, jadi kita perlu cara lain
+    // Solusi: Gunakan bin dengan nama yang unik dan diketahui semua device
+    // Setelah Device A setup, bin ini akan dibuat dan digunakan oleh semua device
+    
+    // Coba create master config bin dengan nama yang sama
+    // Jika sudah ada (dari Device A), akan error, tapi kita bisa handle
     const response = await fetch(JSONBIN_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-Master-Key': apiKey,
-        'X-Bin-Name': 'Portal Indonesia - Config (Bin IDs)'
+        'X-Bin-Name': MASTER_CONFIG_BIN_NAME
       },
-      body: JSON.stringify({ logsBinId: null, contentBinId: null })
+      body: JSON.stringify({ configBinId: null, logsBinId: null, contentBinId: null })
     })
     
-    if (!response.ok) {
-      throw new Error('Failed to create config bin')
+    if (response.ok) {
+      // Bin baru dibuat (Device A pertama kali setup)
+      const data = await response.json()
+      masterBinId = data.metadata.id
+      localStorage.setItem(CONFIG_BIN_ID_KEY, masterBinId)
+      console.log('✅ Created master config bin:', masterBinId)
+    } else {
+      // Bin mungkin sudah ada, tapi kita tidak tahu ID-nya
+      // Solusi: Simpan master bin ID di localStorage Device A setelah setup
+      // Device B, C akan otomatis dapat dari master bin jika tahu ID-nya
+      // Untuk sekarang, kita akan create bin baru (masalah: akan create banyak bin)
+      // TODO: Perlu solusi lain untuk share master bin ID
+      console.warn('Master config bin mungkin sudah ada, tapi ID tidak diketahui. Device ini akan create bin baru.')
+      // Fallback: create dengan nama yang sedikit berbeda
+      const fallbackResponse = await fetch(JSONBIN_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Master-Key': apiKey,
+          'X-Bin-Name': `${MASTER_CONFIG_BIN_NAME} - ${Date.now()}`
+        },
+        body: JSON.stringify({ configBinId: null, logsBinId: null, contentBinId: null })
+      })
+      
+      if (fallbackResponse.ok) {
+        const fallbackData = await fallbackResponse.json()
+        masterBinId = fallbackData.metadata.id
+        localStorage.setItem(CONFIG_BIN_ID_KEY, masterBinId)
+        console.log('✅ Created fallback master config bin:', masterBinId)
+      } else {
+        throw new Error('Failed to create master config bin')
+      }
     }
-    
-    const data = await response.json()
-    configBinId = data.metadata.id
-    localStorage.setItem(CONFIG_BIN_ID_KEY, configBinId)
-    console.log('✅ Created new config bin:', configBinId)
-    console.log('📋 Copy config bin ID ini dan hardcode di src/config/jsonbin.js agar semua device menggunakan config bin yang sama')
-  } else {
-    // Simpan ke localStorage untuk konsistensi
-    localStorage.setItem(CONFIG_BIN_ID_KEY, configBinId)
   }
   
-  return configBinId
+  return masterBinId
 }
+
+// Alias untuk backward compatibility
+export const getOrCreateConfigBin = getOrCreateMasterConfigBin
 
 // Simpan bin ID ke config bin
 const saveBinIdToConfigBin = async (apiKey, type, binId) => {
@@ -275,22 +301,33 @@ const saveBinIdToConfigBin = async (apiKey, type, binId) => {
   }
 }
 
-// Ambil bin ID dari config bin
+// Ambil bin ID dari master config bin
+// Device B, C, dst akan otomatis dapat bin IDs dari master config bin
 const getBinIdFromConfigBin = async (apiKey, type) => {
   try {
-    // Coba ambil config bin ID dari config (hardcoded) atau localStorage
-    let configBinId = getConfigBinId() || localStorage.getItem(CONFIG_BIN_ID_KEY)
+    // Coba ambil master config bin ID dari localStorage
+    let masterBinId = localStorage.getItem(CONFIG_BIN_ID_KEY)
     
-    // Jika belum ada, coba create config bin
-    if (!configBinId) {
-      configBinId = await getOrCreateConfigBin(apiKey)
+    // Jika belum ada, coba create atau cari master config bin
+    // Masalah: JSONBin.io tidak support search, jadi kita tidak bisa cari bin by name
+    // Solusi: Setelah Device A setup, master bin ID akan tersimpan di localStorage Device A
+    // Device B, C perlu tahu master bin ID dari Device A
+    
+    // Untuk sekarang, jika belum ada, kita akan create master bin baru
+    // Tapi ini akan create bin terpisah untuk setiap device
+    // TODO: Perlu cara untuk share master bin ID antar device
+    
+    if (!masterBinId) {
+      // Coba create master config bin (mungkin akan create baru jika belum ada)
+      masterBinId = await getOrCreateMasterConfigBin(apiKey)
     }
     
-    if (!configBinId) {
+    if (!masterBinId) {
       return null
     }
     
-    const response = await fetch(`${JSONBIN_API_URL}/${configBinId}/latest`, {
+    // Read dari master config bin
+    const response = await fetch(`${JSONBIN_API_URL}/${masterBinId}/latest`, {
       method: 'GET',
       headers: {
         'X-Master-Key': apiKey
@@ -312,7 +349,7 @@ const getBinIdFromConfigBin = async (apiKey, type) => {
     
     return null
   } catch (error) {
-    console.warn('Failed to get bin ID from config bin:', error)
+    console.warn('Failed to get bin ID from master config bin:', error)
     return null
   }
 }

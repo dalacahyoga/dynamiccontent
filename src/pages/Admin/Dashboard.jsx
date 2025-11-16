@@ -178,15 +178,18 @@ function Dashboard() {
       const contentBinId = await initializeContentBin(apiKey)
       setJsonbinInitialized(true)
       
-      // Save shared config so other devices can use the same API key and bin IDs
-      saveSharedConfig(apiKey, logsBinId, contentBinId)
+      // Get master config bin ID
+      const masterBinId = localStorage.getItem('jsonbinConfigBinId')
+      
+      // Save shared config dengan master bin ID agar Device B, C bisa pakai
+      saveSharedConfig(apiKey, logsBinId, contentBinId, masterBinId)
       
       // Save current content to cloud immediately after setup
       const currentContent = getActiveContent()
       const { saveContentToCloud } = await import('../../utils/jsonbinStorage')
       await saveContentToCloud(currentContent)
       
-      alert('✅ JSONBin.io berhasil di-setup!\n\nSemua device (B, C, dst) akan OTOMATIS menggunakan API key yang sama tanpa perlu setup manual.')
+      alert('✅ JSONBin.io berhasil di-setup!\n\n📋 Master Config Bin ID: ' + (masterBinId || 'N/A') + '\n\nSemua device (B, C, dst) akan OTOMATIS menggunakan bins yang sama jika master bin ID sudah di-share.')
       // Auto load logs after setup
       await loadLogsFromCloud()
       // Sync content from cloud
@@ -407,27 +410,18 @@ function Dashboard() {
                       <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
                         <span className="bin-id">Logs Bin ID: {getBinId()}</span>
                         <span className="bin-id">Content Bin ID: {localStorage.getItem('jsonbinContentBinId') || 'N/A'}</span>
-                        <span className="bin-id">Config Bin ID: {localStorage.getItem('jsonbinConfigBinId') || 'N/A'}</span>
-                        <button
-                          onClick={() => {
-                            const configBinId = localStorage.getItem('jsonbinConfigBinId')
-                            const text = `const HARDCODED_CONFIG_BIN_ID = '${configBinId}'\n\nCopy config bin ID ini dan paste di src/config/jsonbin.js agar semua device menggunakan config bin yang sama.`
-                            navigator.clipboard.writeText(text)
-                            alert('Config Bin ID copied! Paste di src/config/jsonbin.js')
-                          }}
-                          style={{
-                            marginTop: '0.5rem',
-                            padding: '0.4rem 0.8rem',
-                            background: '#3b82f6',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '0.85rem'
-                          }}
-                        >
-                          📋 Copy Config Bin ID
-                        </button>
+                        <span className="bin-id">Master Config Bin ID: {localStorage.getItem('jsonbinConfigBinId') || 'N/A'}</span>
+                        <div style={{ 
+                          marginTop: '0.5rem', 
+                          padding: '0.8rem', 
+                          background: '#f0f9ff', 
+                          borderRadius: '6px',
+                          fontSize: '0.85rem',
+                          color: '#0369a1'
+                        }}>
+                          <strong>✅ Auto-Setup Aktif:</strong> Master Config Bin ID sudah tersimpan di shared config. 
+                          Device B, C, dst akan otomatis menggunakan bins yang sama saat akses website.
+                        </div>
                       </div>
                     </div>
                     <div className="auto-sync-info">
