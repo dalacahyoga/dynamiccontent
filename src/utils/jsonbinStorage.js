@@ -200,7 +200,18 @@ export const syncLogs = async () => {
 
 // Check if bin is initialized
 export const isInitialized = () => {
-  return !!(getBinId() && getApiKey())
+  // Cek apakah ada bin ID (dari config atau localStorage) dan API key
+  const binId = getBinId()
+  const apiKey = getApiKey()
+  
+  // Jika bin ID ada di config, anggap sudah initialized
+  const configBinIds = getConfigBinIds()
+  if (configBinIds.logsBinId && apiKey) {
+    return true
+  }
+  
+  // Fallback: cek localStorage
+  return !!(binId && apiKey)
 }
 
 // ========== CONTENT SETTINGS SYNC ==========
