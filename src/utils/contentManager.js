@@ -25,14 +25,52 @@ export const getActiveContent = () => {
   }
 }
 
-export const setActiveContent = (content) => {
+// Sync content from cloud (for auto-update across devices)
+export const syncContentFromCloud = async () => {
+  try {
+    const { isInitialized, getContentFromCloud } = await import('./jsonbinStorage')
+    if (!isInitialized()) {
+      return null
+    }
+    
+    const cloudContent = await getContentFromCloud()
+    if (cloudContent && cloudContent !== getActiveContent()) {
+      // Update localStorage if cloud has different content
+      localStorage.setItem('activeContent', cloudContent)
+      return cloudContent
+    }
+    
+    return null
+  } catch (error) {
+    console.warn('Error syncing content from cloud:', error)
+    return null
+  }
+}
+
+export const setActiveContent = async (content) => {
   try {
     // Prevent setting BOTH option (only allow single content)
     if (content === CONTENT_OPTIONS.BOTH) {
       console.warn('BOTH option is no longer supported. Please select a single content.')
       return false
     }
+    
+    // Save to localStorage
     localStorage.setItem('activeContent', content)
+    
+    // Sync to cloud if JSONBin.io is initialized
+    try {
+      const { isInitialized, saveContentToCloud } = await import('./jsonbinStorage')
+      if (isInitialized()) {
+        // Sync in background (don't wait for it)
+        saveContentToCloud(content).catch(err => {
+          console.warn('Failed to sync content to cloud:', err)
+        })
+      }
+    } catch (error) {
+      // JSONBin not available, continue silently
+    }
+    
     return true
   } catch (error) {
     console.error('Error setting active content:', error)

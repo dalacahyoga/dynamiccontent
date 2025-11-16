@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { trackUserAccess } from '../utils/tracker'
-import { getActiveContent, CONTENT_OPTIONS, getContentTitle, getContentFavicon } from '../utils/contentManager'
+import { getActiveContent, CONTENT_OPTIONS, getContentTitle, getContentFavicon, syncContentFromCloud } from '../utils/contentManager'
 import { updateFavicon } from '../utils/faviconManager'
+import { isInitialized } from '../utils/jsonbinStorage'
 import TimnasContent from '../components/contents/TimnasContent'
 import PulauSeribuContent from '../components/contents/PulauSeribuContent'
 import GunungKawiContent from '../components/contents/GunungKawiContent'
@@ -33,6 +34,15 @@ function Home() {
     // Get active content from localStorage
     const content = getActiveContent()
     setActiveContent(content)
+    
+    // Sync content from cloud if JSONBin is initialized
+    if (isInitialized()) {
+      syncContentFromCloud().then(newContent => {
+        if (newContent) {
+          setActiveContent(newContent)
+        }
+      })
+    }
   }, [])
 
   // Listen for storage changes to update content dynamically
@@ -45,12 +55,26 @@ function Home() {
     window.addEventListener('storage', handleStorageChange)
     // Also listen for custom event from admin panel
     window.addEventListener('contentChanged', handleStorageChange)
+    
+    // Auto-sync content from cloud every 5 seconds if JSONBin is initialized
+    let contentSyncInterval
+    if (isInitialized()) {
+      contentSyncInterval = setInterval(async () => {
+        const newContent = await syncContentFromCloud()
+        if (newContent && newContent !== activeContent) {
+          setActiveContent(newContent)
+        }
+      }, 5000) // Sync every 5 seconds
+    }
 
     return () => {
       window.removeEventListener('storage', handleStorageChange)
       window.removeEventListener('contentChanged', handleStorageChange)
+      if (contentSyncInterval) {
+        clearInterval(contentSyncInterval)
+      }
     }
-  }, [])
+  }, [activeContent])
 
   // Render content based on active content type
   const renderContent = () => {

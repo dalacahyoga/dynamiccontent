@@ -162,3 +162,107 @@ export const isInitialized = () => {
   return !!(getBinId() && getApiKey())
 }
 
+// ========== CONTENT SETTINGS SYNC ==========
+
+const CONTENT_BIN_ID_KEY = 'jsonbinContentBinId'
+
+// Initialize content settings bin
+export const initializeContentBin = async (apiKey) => {
+  try {
+    let binId = localStorage.getItem(CONTENT_BIN_ID_KEY)
+    
+    if (!binId) {
+      // Create new bin for content settings
+      const response = await fetch(JSONBIN_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Master-Key': apiKey,
+          'X-Bin-Name': 'Portal Indonesia - Content Settings'
+        },
+        body: JSON.stringify({ activeContent: 'none' })
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to create content bin')
+      }
+      
+      const data = await response.json()
+      binId = data.metadata.id
+      localStorage.setItem(CONTENT_BIN_ID_KEY, binId)
+    }
+    
+    return binId
+  } catch (error) {
+    console.error('Error initializing content bin:', error)
+    throw error
+  }
+}
+
+// Get content settings from cloud
+export const getContentFromCloud = async () => {
+  try {
+    const binId = localStorage.getItem(CONTENT_BIN_ID_KEY)
+    const apiKey = getApiKey()
+    
+    if (!binId || !apiKey) {
+      return null
+    }
+    
+    const response = await fetch(`${JSONBIN_API_URL}/${binId}/latest`, {
+      method: 'GET',
+      headers: {
+        'X-Master-Key': apiKey
+      }
+    })
+    
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null
+      }
+      throw new Error('Failed to fetch content settings')
+    }
+    
+    const data = await response.json()
+    return data.record?.activeContent || null
+  } catch (error) {
+    console.error('Error fetching content from cloud:', error)
+    return null
+  }
+}
+
+// Save content settings to cloud
+export const saveContentToCloud = async (activeContent) => {
+  try {
+    const binId = localStorage.getItem(CONTENT_BIN_ID_KEY)
+    const apiKey = getApiKey()
+    
+    if (!binId || !apiKey) {
+      // Try to initialize if not exists
+      if (apiKey) {
+        await initializeContentBin(apiKey)
+        return await saveContentToCloud(activeContent) // Retry
+      }
+      return false
+    }
+    
+    const response = await fetch(`${JSONBIN_API_URL}/${binId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Master-Key': apiKey
+      },
+      body: JSON.stringify({ activeContent })
+    })
+    
+    if (!response.ok) {
+      throw new Error('Failed to save content settings')
+    }
+    
+    return true
+  } catch (error) {
+    console.error('Error saving content to cloud:', error)
+    return false
+  }
+}
+

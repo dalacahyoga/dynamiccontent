@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getUserAccessLogs, clearUserAccessLogs, exportLogs, importLogs } from '../../utils/tracker'
-import { getActiveContent, setActiveContent, CONTENT_OPTIONS, getContentLabel } from '../../utils/contentManager'
-import { initializeBin, syncLogs, isInitialized, getApiKey, getBinId } from '../../utils/jsonbinStorage'
+import { getActiveContent, setActiveContent, CONTENT_OPTIONS, getContentLabel, syncContentFromCloud } from '../../utils/contentManager'
+import { initializeBin, syncLogs, isInitialized, getApiKey, getBinId, initializeContentBin } from '../../utils/jsonbinStorage'
 import AdminNav from '../../components/AdminNav'
 import LocationCell from '../../components/LocationCell'
 import './Admin.css'
@@ -61,10 +61,38 @@ function Dashboard() {
       setApiKey(getApiKey())
       // Auto-fetch logs from cloud on load
       loadLogsFromCloud()
+      // Sync content from cloud on load
+      syncContentFromCloud().then(newContent => {
+        if (newContent) {
+          setActiveContentState(newContent)
+          window.dispatchEvent(new Event('contentChanged'))
+        }
+      })
     } else {
       // Load from localStorage only if not using cloud
       const logs = getUserAccessLogs()
       setUserLogs(logs)
+    }
+    
+    // Auto-sync content every 5 seconds if JSONBin is initialized
+    let contentSyncInterval
+    if (initialized) {
+      contentSyncInterval = setInterval(async () => {
+        const newContent = await syncContentFromCloud()
+        if (newContent) {
+          const currentContent = getActiveContent()
+          if (newContent !== currentContent) {
+            setActiveContentState(newContent)
+            window.dispatchEvent(new Event('contentChanged'))
+          }
+        }
+      }, 5000) // Sync every 5 seconds
+    }
+    
+    return () => {
+      if (contentSyncInterval) {
+        clearInterval(contentSyncInterval)
+      }
     }
 
     // Set up polling for auto-refresh (every 10 seconds)
@@ -141,10 +169,19 @@ function Dashboard() {
     try {
       setSyncing(true)
       await initializeBin(apiKey.trim())
+      // Also initialize content bin for content settings sync
+      await initializeContentBin(apiKey.trim())
       setJsonbinInitialized(true)
-      alert('JSONBin.io berhasil di-setup! Log akan otomatis tersinkronisasi dan muncul di semua device.')
+      alert('JSONBin.io berhasil di-setup! Log dan pengaturan konten akan otomatis tersinkronisasi di semua device.')
       // Auto load logs after setup
       await loadLogsFromCloud()
+      // Sync content from cloud
+      await syncContentFromCloud().then(newContent => {
+        if (newContent) {
+          setActiveContentState(newContent)
+          window.dispatchEvent(new Event('contentChanged'))
+        }
+      })
       
       // Restart polling
       const pollInterval = setInterval(() => {
@@ -159,12 +196,13 @@ function Dashboard() {
     }
   }
 
-  const handleContentChange = (contentType) => {
-    if (setActiveContent(contentType)) {
+  const handleContentChange = async (contentType) => {
+    const success = await setActiveContent(contentType)
+    if (success) {
       setActiveContentState(contentType)
       // Dispatch custom event to notify other components
       window.dispatchEvent(new Event('contentChanged'))
-      alert(`Konten berhasil diubah menjadi: ${getContentLabel(contentType)}`)
+      alert(`Konten berhasil diubah menjadi: ${getContentLabel(contentType)}. Perubahan akan tersinkronisasi ke semua device.`)
     } else {
       alert('Gagal mengubah konten')
     }
@@ -184,6 +222,46 @@ function Dashboard() {
     <div className="admin-container">
       <AdminNav activeTab={activeTab} onTabChange={setActiveTab} onLogout={handleLogout} />
       <div className="dashboard-container">
+        {/* Warning Banner if JSONBin.io not initialized */}
+        {!jsonbinInitialized && (
+          <div className="warning-banner" style={{
+            background: 'linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%)',
+            color: 'white',
+            padding: '1rem 1.5rem',
+            marginBottom: '1.5rem',
+            borderRadius: '8px',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem'
+          }}>
+            <div style={{ fontSize: '2rem' }}>⚠️</div>
+            <div style={{ flex: 1 }}>
+              <strong style={{ fontSize: '1.1rem', display: 'block', marginBottom: '0.5rem' }}>
+                Cloud Sync Belum Diaktifkan!
+              </strong>
+              <p style={{ margin: 0, fontSize: '0.95rem' }}>
+                Log dan pengaturan konten hanya tersimpan di browser ini. Untuk melihat log dari device lain dan sync konten antar device, 
+                <strong> silakan setup JSONBin.io di tab "👥 Daftar Pengunjung"</strong>
+              </p>
+            </div>
+            <button
+              onClick={() => setActiveTab('visitors')}
+              style={{
+                background: 'white',
+                color: '#ff6b6b',
+                border: 'none',
+                padding: '0.6rem 1.2rem',
+                borderRadius: '6px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                fontSize: '0.9rem'
+              }}
+            >
+              Setup Sekarang →
+            </button>
+          </div>
+        )}
         <div className="dashboard-header">
           <div>
             <h1>📊 Administrator Dashboard</h1>
