@@ -112,6 +112,51 @@ Jika JSONBin.io belum di-setup, sistem menggunakan localStorage:
 - **JSONBin.io** - Cloud storage untuk log sync
 - **OpenStreetMap Nominatim** - Reverse geocoding untuk nama lokasi
 
+## 🚀 Deploy ke Netlify
+
+Website ini sudah dikonfigurasi untuk deploy ke Netlify dengan mudah.
+
+### Cara Deploy
+
+1. **Push code ke GitHub**
+   ```bash
+   git add .
+   git commit -m "Prepare for Netlify deployment"
+   git push origin main
+   ```
+
+2. **Login ke Netlify**
+   - Kunjungi [https://app.netlify.com](https://app.netlify.com)
+   - Login dengan GitHub account
+
+3. **Import Project dari GitHub**
+   - Klik "Add new site" → "Import an existing project"
+   - Pilih "Deploy with GitHub"
+   - Authorize Netlify untuk akses GitHub
+   - Pilih repository: `dalacahyoga/dynamiccontent`
+
+4. **Konfigurasi Build Settings**
+   - Build command: `npm run build` (sudah otomatis)
+   - Publish directory: `dist` (sudah otomatis)
+   - Klik "Deploy site"
+
+5. **Selesai!** 🎉
+   - Netlify akan otomatis build dan deploy
+   - Website akan live di URL: `https://your-site-name.netlify.app`
+   - Setiap push ke GitHub akan otomatis trigger deploy baru
+
+### File Konfigurasi
+
+- `netlify.toml` - Konfigurasi build dan redirect untuk SPA routing
+- `public/_redirects` - Fallback routing untuk React Router
+
+### Catatan Penting
+
+- ✅ SPA routing sudah dikonfigurasi dengan redirect rules
+- ✅ Build command dan output directory sudah di-set
+- ✅ Auto-deploy dari GitHub sudah aktif
+- ⚠️ Pastikan environment variables (jika ada) di-set di Netlify dashboard
+
 ## 📚 Dokumentasi
 
 Semua dokumentasi tersedia di folder [`docs/`](docs/):
