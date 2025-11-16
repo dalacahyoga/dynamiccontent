@@ -4,6 +4,7 @@ import { getUserAccessLogs, clearUserAccessLogs, exportLogs, importLogs } from '
 import { getActiveContent, setActiveContent, CONTENT_OPTIONS, getContentLabel, syncContentFromCloud } from '../../utils/contentManager'
 import { initializeBin, syncLogs, isInitialized, getApiKey, getBinId, initializeContentBin } from '../../utils/jsonbinStorage'
 import { saveSharedConfig } from '../../utils/sharedConfig'
+import { getConfigApiKey } from '../../config/jsonbin'
 import AdminNav from '../../components/AdminNav'
 import LocationCell from '../../components/LocationCell'
 import './Admin.css'
@@ -162,27 +163,30 @@ function Dashboard() {
   }
 
   const handleSetupJsonbin = async () => {
-    if (!apiKey.trim()) {
-      alert('Masukkan API Key JSONBin.io')
+    // API key sudah di-hardcode, langsung pakai dari config
+    const apiKey = getConfigApiKey()
+    
+    if (!apiKey) {
+      alert('API key tidak ditemukan. Pastikan API key sudah di-hardcode di src/config/jsonbin.js')
       return
     }
 
     try {
       setSyncing(true)
-      const logsBinId = await initializeBin(apiKey.trim())
+      const logsBinId = await initializeBin(apiKey)
       // Also initialize content bin for content settings sync
-      const contentBinId = await initializeContentBin(apiKey.trim())
+      const contentBinId = await initializeContentBin(apiKey)
       setJsonbinInitialized(true)
       
       // Save shared config so other devices can use the same API key and bin IDs
-      saveSharedConfig(apiKey.trim(), logsBinId, contentBinId)
+      saveSharedConfig(apiKey, logsBinId, contentBinId)
       
       // Save current content to cloud immediately after setup
       const currentContent = getActiveContent()
       const { saveContentToCloud } = await import('../../utils/jsonbinStorage')
       await saveContentToCloud(currentContent)
       
-      alert('JSONBin.io berhasil di-setup! Log dan pengaturan konten akan otomatis tersinkronisasi di semua device.\n\n⚠️ PENTING: Device lain (B, C, dll) juga perlu setup dengan API key yang sama untuk sync bekerja. Atau gunakan fitur "Share Config" untuk mempermudah.')
+      alert('✅ JSONBin.io berhasil di-setup!\n\nSemua device (B, C, dst) akan OTOMATIS menggunakan API key yang sama tanpa perlu setup manual.')
       // Auto load logs after setup
       await loadLogsFromCloud()
       // Sync content from cloud
@@ -368,32 +372,33 @@ function Dashboard() {
                       <strong> TIDAK AKAN muncul</strong> di dashboard ini. Hanya log dari device ini yang terlihat.
                     </div>
                     <p className="setup-info">
-                      Setup JSONBin.io untuk sync log otomatis antar device. 
-                      <strong> Gratis, tidak perlu backend!</strong>
+                      API key sudah di-hardcode. Klik tombol di bawah untuk setup bins.
                     </p>
-                    <div className="setup-steps">
-                      <ol>
-                        <li>Daftar di <a href="https://jsonbin.io" target="_blank" rel="noopener noreferrer">jsonbin.io</a> (gratis)</li>
-                        <li>Copy API Key dari dashboard</li>
-                        <li>Paste di bawah dan klik Setup</li>
-                      </ol>
+                    <div style={{ 
+                      padding: '0.8rem', 
+                      background: '#f0f9ff', 
+                      borderRadius: '6px', 
+                      marginBottom: '1rem',
+                      fontSize: '0.9rem'
+                    }}>
+                      <strong>API Key:</strong> <code style={{ 
+                        background: 'white', 
+                        padding: '0.2rem 0.4rem', 
+                        borderRadius: '3px',
+                        fontSize: '0.85rem'
+                      }}>{getConfigApiKey()?.substring(0, 30)}...</code>
                     </div>
-                    <div className="api-key-input">
-                      <input
-                        type="text"
-                        placeholder="Masukkan JSONBin.io API Key"
-                        value={apiKey}
-                        onChange={(e) => setApiKey(e.target.value)}
-                        className="api-key-field"
-                      />
-                      <button 
-                        onClick={handleSetupJsonbin} 
-                        className="setup-button"
-                        disabled={syncing}
-                      >
-                        {syncing ? 'Setting up...' : '🔧 Setup'}
-                      </button>
-                    </div>
+                    <button 
+                      onClick={handleSetupJsonbin} 
+                      className="setup-button"
+                      disabled={syncing}
+                      style={{ width: '100%' }}
+                    >
+                      {syncing ? '🔄 Setting up...' : '✅ Setup JSONBin.io (Auto dengan API Key)'}
+                    </button>
+                    <p style={{ marginTop: '1rem', fontSize: '0.85rem', color: '#059669' }}>
+                      ✅ Semua device (B, C, dst) akan otomatis menggunakan API key yang sama tanpa perlu setup manual.
+                    </p>
                   </div>
                 ) : (
                   <div className="sync-card">
@@ -402,13 +407,13 @@ function Dashboard() {
                       <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
                         <span className="bin-id">Logs Bin ID: {getBinId()}</span>
                         <span className="bin-id">Content Bin ID: {localStorage.getItem('jsonbinContentBinId') || 'N/A'}</span>
+                        <span className="bin-id">Config Bin ID: {localStorage.getItem('jsonbinConfigBinId') || 'N/A'}</span>
                         <button
                           onClick={() => {
-                            const logsBinId = getBinId()
-                            const contentBinId = localStorage.getItem('jsonbinContentBinId')
-                            const text = `Logs Bin ID: ${logsBinId}\nContent Bin ID: ${contentBinId}\n\nCopy bin IDs ini dan hardcode di src/config/jsonbin.js agar semua device menggunakan bins yang sama.`
+                            const configBinId = localStorage.getItem('jsonbinConfigBinId')
+                            const text = `const HARDCODED_CONFIG_BIN_ID = '${configBinId}'\n\nCopy config bin ID ini dan paste di src/config/jsonbin.js agar semua device menggunakan config bin yang sama.`
                             navigator.clipboard.writeText(text)
-                            alert('Bin IDs copied! Paste di src/config/jsonbin.js untuk hardcode bin IDs.')
+                            alert('Config Bin ID copied! Paste di src/config/jsonbin.js')
                           }}
                           style={{
                             marginTop: '0.5rem',
@@ -421,7 +426,7 @@ function Dashboard() {
                             fontSize: '0.85rem'
                           }}
                         >
-                          📋 Copy Bin IDs untuk Hardcode
+                          📋 Copy Config Bin ID
                         </button>
                       </div>
                     </div>
