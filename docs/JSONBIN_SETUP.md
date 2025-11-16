@@ -4,7 +4,7 @@
 
 Sistem ini menggunakan **JSONBin.io** - service gratis untuk menyimpan JSON di cloud tanpa perlu membuat backend sendiri.
 
-**📋 Untuk panduan step-by-step yang lebih detail, lihat `PANDUAN_SETUP_JSONBIN.md`**
+**📋 Untuk panduan step-by-step yang lebih detail, lihat [`PANDUAN_SETUP_JSONBIN.md`](PANDUAN_SETUP_JSONBIN.md)**
 
 ## ✅ Keuntungan
 

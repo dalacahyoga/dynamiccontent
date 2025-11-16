@@ -88,8 +88,8 @@ Website ini sudah terintegrasi dengan **JSONBin.io** untuk cloud sync tanpa back
 - ✅ **Mudah setup** - Hanya perlu API key
 
 **Panduan Setup:**
-- 📋 **Step-by-step:** Lihat `PANDUAN_SETUP_JSONBIN.md`
-- 🔧 **Detail Teknis:** Lihat `JSONBIN_SETUP.md`
+- 📋 **Step-by-step:** Lihat [`docs/PANDUAN_SETUP_JSONBIN.md`](docs/PANDUAN_SETUP_JSONBIN.md)
+- 🔧 **Detail Teknis:** Lihat [`docs/JSONBIN_SETUP.md`](docs/JSONBIN_SETUP.md)
 
 ### ⚠️ Tanpa Cloud Sync (LocalStorage Only)
 
@@ -101,7 +101,7 @@ Jika JSONBin.io belum di-setup, sistem menggunakan localStorage:
 - ❌ Log hanya tersimpan di browser masing-masing device
 - ❌ Data hilang jika user clear browser data
 
-**Lihat `LOGGING_SYSTEM.md` untuk detail lebih lengkap.**
+**Lihat [`docs/LOGGING_SYSTEM.md`](docs/LOGGING_SYSTEM.md) untuk detail lebih lengkap.**
 
 ## 🛠️ Teknologi
 
@@ -114,8 +114,10 @@ Jika JSONBin.io belum di-setup, sistem menggunakan localStorage:
 
 ## 📚 Dokumentasi
 
+Semua dokumentasi tersedia di folder [`docs/`](docs/):
+
 - `README.md` - Dokumentasi utama (file ini)
-- `PANDUAN_SETUP_JSONBIN.md` - Panduan step-by-step setup JSONBin.io
-- `JSONBIN_SETUP.md` - Dokumentasi teknis JSONBin.io
-- `LOGGING_SYSTEM.md` - Dokumentasi sistem logging
+- [`docs/PANDUAN_SETUP_JSONBIN.md`](docs/PANDUAN_SETUP_JSONBIN.md) - Panduan step-by-step setup JSONBin.io
+- [`docs/JSONBIN_SETUP.md`](docs/JSONBIN_SETUP.md) - Dokumentasi teknis JSONBin.io
+- [`docs/LOGGING_SYSTEM.md`](docs/LOGGING_SYSTEM.md) - Dokumentasi sistem logging
 

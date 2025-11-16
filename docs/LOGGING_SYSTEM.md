@@ -53,7 +53,7 @@ Website ini sudah terintegrasi dengan **JSONBin.io** untuk cloud sync tanpa back
 - ✅ **Real-time** - Auto-refresh setiap 10 detik
 - ✅ **Mudah setup** - Hanya perlu API key
 
-**Lihat `PANDUAN_SETUP_JSONBIN.md` untuk panduan setup step-by-step.**
+**Lihat [`PANDUAN_SETUP_JSONBIN.md`](PANDUAN_SETUP_JSONBIN.md) untuk panduan setup step-by-step.**
 
 ## 🔧 Alternatif Solusi Lain
 
