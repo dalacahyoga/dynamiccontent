@@ -26,18 +26,28 @@ export const getActiveContent = () => {
 }
 
 // Sync content from cloud (for auto-update across devices)
+// Works even if JSONBin.io is not fully initialized (just needs bin ID)
 export const syncContentFromCloud = async () => {
   try {
-    const { isInitialized, getContentFromCloud } = await import('./jsonbinStorage')
-    if (!isInitialized()) {
+    const { getContentFromCloud, getBinId } = await import('./jsonbinStorage')
+    
+    // Check if content bin ID exists (even without API key, we can try to read)
+    const contentBinId = localStorage.getItem('jsonbinContentBinId')
+    const logsBinId = getBinId()
+    
+    // If no bin ID at all, can't sync
+    if (!contentBinId && !logsBinId) {
       return null
     }
     
     const cloudContent = await getContentFromCloud()
-    if (cloudContent && cloudContent !== getActiveContent()) {
-      // Update localStorage if cloud has different content
-      localStorage.setItem('activeContent', cloudContent)
-      return cloudContent
+    if (cloudContent) {
+      const currentContent = getActiveContent()
+      if (cloudContent !== currentContent) {
+        // Update localStorage if cloud has different content
+        localStorage.setItem('activeContent', cloudContent)
+        return cloudContent
+      }
     }
     
     return null

@@ -2,7 +2,9 @@ import React, { useEffect, useState, useRef } from 'react'
 import { trackUserAccess } from '../utils/tracker'
 import { getActiveContent, CONTENT_OPTIONS, getContentTitle, getContentFavicon, syncContentFromCloud } from '../utils/contentManager'
 import { updateFavicon } from '../utils/faviconManager'
-import { isInitialized } from '../utils/jsonbinStorage'
+import { isInitialized, initializeBin, initializeContentBin } from '../utils/jsonbinStorage'
+import { autoLoadSharedConfig } from '../utils/sharedConfig'
+import { getConfigApiKey, hasApiKey } from '../config/jsonbin'
 import TimnasContent from '../components/contents/TimnasContent'
 import PulauSeribuContent from '../components/contents/PulauSeribuContent'
 import GunungKawiContent from '../components/contents/GunungKawiContent'
@@ -31,18 +33,39 @@ function Home() {
       hasTracked.current = true
     }
     
+    // Auto-load shared config if available (from device A setup)
+    autoLoadSharedConfig()
+    
+    // Auto-initialize JSONBin.io if API key is available in config
+    // This allows device B, C, etc to automatically setup without manual intervention
+    const autoSetup = async () => {
+      if (hasApiKey() && !isInitialized()) {
+        try {
+          const apiKey = getConfigApiKey()
+          if (apiKey) {
+            // Auto-initialize bins (silently, in background)
+            await initializeBin(apiKey).catch(err => console.warn('Auto-init logs bin failed:', err))
+            await initializeContentBin(apiKey).catch(err => console.warn('Auto-init content bin failed:', err))
+            console.log('✅ JSONBin.io auto-initialized from config')
+          }
+        } catch (error) {
+          console.warn('Auto-setup JSONBin.io failed:', error)
+        }
+      }
+    }
+    
+    autoSetup()
+    
     // Get active content from localStorage
     const content = getActiveContent()
     setActiveContent(content)
     
-    // Sync content from cloud if JSONBin is initialized
-    if (isInitialized()) {
-      syncContentFromCloud().then(newContent => {
-        if (newContent) {
-          setActiveContent(newContent)
-        }
-      })
-    }
+    // Always try to sync content from cloud (works even without API key if bin ID exists)
+    syncContentFromCloud().then(newContent => {
+      if (newContent) {
+        setActiveContent(newContent)
+      }
+    })
   }, [])
 
   // Listen for storage changes to update content dynamically
@@ -56,16 +79,14 @@ function Home() {
     // Also listen for custom event from admin panel
     window.addEventListener('contentChanged', handleStorageChange)
     
-    // Auto-sync content from cloud every 5 seconds if JSONBin is initialized
-    let contentSyncInterval
-    if (isInitialized()) {
-      contentSyncInterval = setInterval(async () => {
-        const newContent = await syncContentFromCloud()
-        if (newContent && newContent !== activeContent) {
-          setActiveContent(newContent)
-        }
-      }, 5000) // Sync every 5 seconds
-    }
+    // Auto-sync content from cloud every 5 seconds
+    // Works even without API key if content bin ID exists
+    const contentSyncInterval = setInterval(async () => {
+      const newContent = await syncContentFromCloud()
+      if (newContent && newContent !== activeContent) {
+        setActiveContent(newContent)
+      }
+    }, 5000) // Sync every 5 seconds
 
     return () => {
       window.removeEventListener('storage', handleStorageChange)

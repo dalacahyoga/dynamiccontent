@@ -2,23 +2,43 @@
 // Free service: https://jsonbin.io
 // No backend needed - direct API calls from frontend
 
+import { getConfigApiKey, getConfigBinIds } from '../config/jsonbin'
+
 const JSONBIN_API_URL = 'https://api.jsonbin.io/v3/b'
 const JSONBIN_BIN_ID_KEY = 'jsonbinBinId'
 const JSONBIN_API_KEY_KEY = 'jsonbinApiKey'
 
 // Initialize or get bin ID
-export const initializeBin = async (apiKey) => {
+// If apiKey is not provided, try to get from config
+export const initializeBin = async (apiKey = null) => {
   try {
+    // Use provided API key, or get from config, or from localStorage
+    const finalApiKey = apiKey || getConfigApiKey() || localStorage.getItem(JSONBIN_API_KEY_KEY)
+    
+    if (!finalApiKey) {
+      throw new Error('API key is required. Please setup JSONBin.io first or set VITE_JSONBIN_API_KEY in environment.')
+    }
+    
     // Check if bin ID already exists
     let binId = localStorage.getItem(JSONBIN_BIN_ID_KEY)
     
+    // Try to get bin ID from config/environment variable first (for device B, C, etc)
     if (!binId) {
-      // Create new bin
+      const configBinIds = getConfigBinIds()
+      if (configBinIds.logsBinId) {
+        binId = configBinIds.logsBinId
+        localStorage.setItem(JSONBIN_BIN_ID_KEY, binId)
+        console.log('✅ Using logs bin ID from config/environment')
+      }
+    }
+    
+    if (!binId) {
+      // Create new bin (only if bin ID not found in config)
       const response = await fetch(JSONBIN_API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Master-Key': apiKey,
+          'X-Master-Key': finalApiKey,
           'X-Bin-Name': 'Portal Indonesia - Access Logs'
         },
         body: JSON.stringify({ logs: [] })
@@ -31,11 +51,11 @@ export const initializeBin = async (apiKey) => {
       const data = await response.json()
       binId = data.metadata.id
       localStorage.setItem(JSONBIN_BIN_ID_KEY, binId)
-      localStorage.setItem(JSONBIN_API_KEY_KEY, apiKey)
+      console.log('✅ Created new logs bin:', binId)
     } else {
       // Save API key if not exists
       if (!localStorage.getItem(JSONBIN_API_KEY_KEY)) {
-        localStorage.setItem(JSONBIN_API_KEY_KEY, apiKey)
+        localStorage.setItem(JSONBIN_API_KEY_KEY, finalApiKey)
       }
     }
     
@@ -46,8 +66,19 @@ export const initializeBin = async (apiKey) => {
   }
 }
 
-// Get API key from storage
+// Get API key from storage or config
 export const getApiKey = () => {
+  // First try config/environment variable (for auto-setup)
+  const configKey = getConfigApiKey()
+  if (configKey) {
+    // Save to localStorage for consistency
+    if (!localStorage.getItem(JSONBIN_API_KEY_KEY)) {
+      localStorage.setItem(JSONBIN_API_KEY_KEY, configKey)
+    }
+    return configKey
+  }
+  
+  // Fallback to localStorage
   return localStorage.getItem(JSONBIN_API_KEY_KEY)
 }
 
@@ -167,20 +198,41 @@ export const isInitialized = () => {
 const CONTENT_BIN_ID_KEY = 'jsonbinContentBinId'
 
 // Initialize content settings bin
-export const initializeContentBin = async (apiKey) => {
+// If apiKey is not provided, try to get from config
+export const initializeContentBin = async (apiKey = null) => {
   try {
+    // Use provided API key, or get from config, or from localStorage
+    const finalApiKey = apiKey || getConfigApiKey() || localStorage.getItem(JSONBIN_API_KEY_KEY)
+    
+    if (!finalApiKey) {
+      throw new Error('API key is required. Please setup JSONBin.io first or set VITE_JSONBIN_API_KEY in environment.')
+    }
+    
     let binId = localStorage.getItem(CONTENT_BIN_ID_KEY)
     
+    // Try to get bin ID from config/environment variable first (for device B, C, etc)
     if (!binId) {
-      // Create new bin for content settings
+      const configBinIds = getConfigBinIds()
+      if (configBinIds.contentBinId) {
+        binId = configBinIds.contentBinId
+        localStorage.setItem(CONTENT_BIN_ID_KEY, binId)
+        console.log('✅ Using content bin ID from config/environment')
+      }
+    }
+    
+    if (!binId) {
+      // Get current content from localStorage
+      const currentContent = localStorage.getItem('activeContent') || 'none'
+      
+      // Create new bin for content settings (only if bin ID not found in config)
       const response = await fetch(JSONBIN_API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Master-Key': apiKey,
+          'X-Master-Key': finalApiKey,
           'X-Bin-Name': 'Portal Indonesia - Content Settings'
         },
-        body: JSON.stringify({ activeContent: 'none' })
+        body: JSON.stringify({ activeContent: currentContent })
       })
       
       if (!response.ok) {
@@ -190,6 +242,7 @@ export const initializeContentBin = async (apiKey) => {
       const data = await response.json()
       binId = data.metadata.id
       localStorage.setItem(CONTENT_BIN_ID_KEY, binId)
+      console.log('✅ Created new content bin:', binId)
     }
     
     return binId
@@ -200,24 +253,38 @@ export const initializeContentBin = async (apiKey) => {
 }
 
 // Get content settings from cloud
+// Try to read without API key first (if bin is public), then with API key if available
 export const getContentFromCloud = async () => {
   try {
     const binId = localStorage.getItem(CONTENT_BIN_ID_KEY)
     const apiKey = getApiKey()
     
-    if (!binId || !apiKey) {
+    if (!binId) {
       return null
     }
     
-    const response = await fetch(`${JSONBIN_API_URL}/${binId}/latest`, {
-      method: 'GET',
-      headers: {
-        'X-Master-Key': apiKey
-      }
+    // Try to read without API key first (for public bins)
+    let response = await fetch(`${JSONBIN_API_URL}/${binId}/latest`, {
+      method: 'GET'
     })
+    
+    // If unauthorized and we have API key, try with API key
+    if (!response.ok && response.status === 401 && apiKey) {
+      response = await fetch(`${JSONBIN_API_URL}/${binId}/latest`, {
+        method: 'GET',
+        headers: {
+          'X-Master-Key': apiKey
+        }
+      })
+    }
     
     if (!response.ok) {
       if (response.status === 404) {
+        return null
+      }
+      // If still unauthorized without API key, return null (bin is private and no API key)
+      if (response.status === 401) {
+        console.warn('Content bin is private and no API key available. Content sync will not work for visitors.')
         return null
       }
       throw new Error('Failed to fetch content settings')

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { getUserAccessLogs, clearUserAccessLogs, exportLogs, importLogs } from '../../utils/tracker'
 import { getActiveContent, setActiveContent, CONTENT_OPTIONS, getContentLabel, syncContentFromCloud } from '../../utils/contentManager'
 import { initializeBin, syncLogs, isInitialized, getApiKey, getBinId, initializeContentBin } from '../../utils/jsonbinStorage'
+import { saveSharedConfig } from '../../utils/sharedConfig'
 import AdminNav from '../../components/AdminNav'
 import LocationCell from '../../components/LocationCell'
 import './Admin.css'
@@ -168,11 +169,20 @@ function Dashboard() {
 
     try {
       setSyncing(true)
-      await initializeBin(apiKey.trim())
+      const logsBinId = await initializeBin(apiKey.trim())
       // Also initialize content bin for content settings sync
-      await initializeContentBin(apiKey.trim())
+      const contentBinId = await initializeContentBin(apiKey.trim())
       setJsonbinInitialized(true)
-      alert('JSONBin.io berhasil di-setup! Log dan pengaturan konten akan otomatis tersinkronisasi di semua device.')
+      
+      // Save shared config so other devices can use the same API key and bin IDs
+      saveSharedConfig(apiKey.trim(), logsBinId, contentBinId)
+      
+      // Save current content to cloud immediately after setup
+      const currentContent = getActiveContent()
+      const { saveContentToCloud } = await import('../../utils/jsonbinStorage')
+      await saveContentToCloud(currentContent)
+      
+      alert('JSONBin.io berhasil di-setup! Log dan pengaturan konten akan otomatis tersinkronisasi di semua device.\n\n⚠️ PENTING: Device lain (B, C, dll) juga perlu setup dengan API key yang sama untuk sync bekerja. Atau gunakan fitur "Share Config" untuk mempermudah.')
       // Auto load logs after setup
       await loadLogsFromCloud()
       // Sync content from cloud
@@ -389,11 +399,48 @@ function Dashboard() {
                   <div className="sync-card">
                     <div className="sync-status">
                       <span className="status-badge success">✓ Terhubung & Auto-Sync Aktif</span>
-                      <span className="bin-id">Bin ID: {getBinId()?.substring(0, 20)}...</span>
+                      <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                        <span className="bin-id">Logs Bin ID: {getBinId()}</span>
+                        <span className="bin-id">Content Bin ID: {localStorage.getItem('jsonbinContentBinId') || 'N/A'}</span>
+                        <button
+                          onClick={() => {
+                            const logsBinId = getBinId()
+                            const contentBinId = localStorage.getItem('jsonbinContentBinId')
+                            const apiKey = getApiKey()
+                            const text = `VITE_JSONBIN_API_KEY=${apiKey}\nVITE_JSONBIN_LOGS_BIN_ID=${logsBinId}\nVITE_JSONBIN_CONTENT_BIN_ID=${contentBinId}`
+                            navigator.clipboard.writeText(text)
+                            alert('Environment variables copied! Paste di Netlify Environment Variables.')
+                          }}
+                          style={{
+                            marginTop: '0.5rem',
+                            padding: '0.4rem 0.8rem',
+                            background: '#3b82f6',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '0.85rem'
+                          }}
+                        >
+                          📋 Copy Env Vars untuk Device Lain
+                        </button>
+                      </div>
                     </div>
                     <div className="auto-sync-info">
                       <p>✅ Log otomatis tersinkronisasi setiap 10 detik</p>
                       <p>✅ Log dari semua device otomatis muncul tanpa perlu manual sync</p>
+                      <p>✅ Konten otomatis tersinkronisasi setiap 5 detik</p>
+                    </div>
+                    <div style={{ marginTop: '1rem', padding: '1rem', background: '#f0f9ff', borderRadius: '6px', border: '1px solid #bae6fd' }}>
+                      <strong style={{ color: '#0369a1', display: 'block', marginBottom: '0.5rem' }}>
+                        📋 Info untuk Device Lain:
+                      </strong>
+                      <p style={{ margin: '0.5rem 0', fontSize: '0.9rem', color: '#0369a1' }}>
+                        Device lain (B, C, dll) juga perlu setup dengan <strong>API key yang sama</strong> untuk sync bekerja.
+                      </p>
+                      <p style={{ margin: '0.5rem 0', fontSize: '0.85rem', color: '#075985' }}>
+                        API Key: <code style={{ background: 'white', padding: '0.2rem 0.4rem', borderRadius: '3px' }}>{getApiKey()?.substring(0, 20)}...</code>
+                      </p>
                     </div>
                     <button 
                       onClick={handleRefreshLogs} 

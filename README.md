@@ -140,22 +140,34 @@ Website ini sudah dikonfigurasi untuk deploy ke Netlify dengan mudah.
    - Publish directory: `dist` (sudah otomatis)
    - Klik "Deploy site"
 
-5. **Selesai!** 🎉
+5. **Setup Environment Variable (PENTING untuk Auto-Setup)**
+   - Setelah deploy pertama, go to **Site settings** → **Environment variables**
+   - Add variable:
+     - **Key:** `VITE_JSONBIN_API_KEY`
+     - **Value:** `$2a$10$KJMZHD2T9JURi3VYxeY.MOEM3jU2qB7nGl3yH5EU2Cqgh0XN5fy2.`
+   - Klik **Save**
+   - **Redeploy** website
+
+6. **Selesai!** 🎉
    - Netlify akan otomatis build dan deploy
    - Website akan live di URL: `https://your-site-name.netlify.app`
    - Setiap push ke GitHub akan otomatis trigger deploy baru
+   - **Device B, C, dst akan otomatis setup** tanpa perlu manual setup!
 
 ### File Konfigurasi
 
 - `netlify.toml` - Konfigurasi build dan redirect untuk SPA routing
 - `public/_redirects` - Fallback routing untuk React Router
+- `src/config/jsonbin.js` - Konfigurasi JSONBin.io API key
 
 ### Catatan Penting
 
 - ✅ SPA routing sudah dikonfigurasi dengan redirect rules
 - ✅ Build command dan output directory sudah di-set
 - ✅ Auto-deploy dari GitHub sudah aktif
-- ⚠️ Pastikan environment variables (jika ada) di-set di Netlify dashboard
+- ✅ **Auto-setup JSONBin.io** untuk device B, C, dst (jika environment variable di-set)
+- ⚠️ **PENTING:** Set environment variable `VITE_JSONBIN_API_KEY` di Netlify untuk auto-setup bekerja
+- 📋 Lihat [`docs/AUTO_SETUP_JSONBIN.md`](docs/AUTO_SETUP_JSONBIN.md) untuk panduan lengkap auto-setup
 
 ## 📚 Dokumentasi
 
