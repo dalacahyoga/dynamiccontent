@@ -67,9 +67,22 @@ create policy "alias update" on aliases for update to authenticated using (true)
 create policy "pv insert"  on pageviews for insert to anon, authenticated with check (true);
 create policy "pv read"    on pageviews for select to authenticated using (true);
 create policy "pv delete"  on pageviews for delete to authenticated using (true);
--- anon boleh UPDATE baris kunjungannya sendiri (tombol "Lokasi" memperbarui
--- lokasi di baris yang sama, bukan menambah baris baru)
-create policy "pv update"  on pageviews for update to anon, authenticated using (true) with check (true);
+
+-- Memperbarui lokasi kunjungan (mis. IP -> GPS saat tombol "Lokasi" di-allow)
+-- TANPA membuka SELECT ke anon. Anon tak punya SELECT di pageviews, jadi
+-- UPDATE...WHERE biasa tak bisa menemukan baris. Pakai fungsi SECURITY DEFINER
+-- yang hanya mengubah meta.location untuk visitId tertentu.
+create or replace function public.set_visit_location(p_visit_id text, p_location jsonb)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  update pageviews
+  set meta = jsonb_set(coalesce(meta, '{}'::jsonb), '{location}', p_location, true)
+  where meta->>'visitId' = p_visit_id;
+$$;
+grant execute on function public.set_visit_location(text, jsonb) to anon, authenticated;
 
 create policy "ev insert"  on events for insert to anon, authenticated with check (true);
 create policy "ev read"    on events for select to authenticated using (true);

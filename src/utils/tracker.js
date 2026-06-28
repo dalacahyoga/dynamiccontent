@@ -105,24 +105,30 @@ function record(meta) {
 
 // Attach/refresh the location on the CURRENT visit's existing row (no new row).
 function saveLocationToVisit(loc) {
-  const base = collectVisitor()
-  base.deviceId = base.vid
-  base.deviceName = getDeviceName(base)
-  const meta = { ...base, visitId: _visitId, location: loc }
-
   if (supabaseEnabled) {
     if (_visitId) {
-      // Best-effort UPDATE of this visit's row. Requires an anon UPDATE policy
-      // on `pageviews` (see docs/SUPABASE_SETUP.md). Never inserts here, so the
-      // raw table keeps ONE row per visit even if the policy is missing.
-      return supabase.from('pageviews').update({ meta }).eq('meta->>visitId', _visitId).then(() => {}, () => {})
+      // Update via a SECURITY DEFINER RPC (see docs/SUPABASE_SETUP.md). Needed
+      // because anon has no SELECT on pageviews, so a normal UPDATE...WHERE
+      // can't locate the row. The function updates only meta.location, scoped
+      // to this visitId. Keeps ONE row per visit (no duplicate insert).
+      return supabase.rpc('set_visit_location', { p_visit_id: _visitId, p_location: loc }).then(() => {}, () => {})
     }
     // No active visit to attach to (rare) → record a fresh view.
-    supabase.from('pageviews').insert({ path: window.location.pathname, ref: meta.referrer, meta }).then(() => {}, () => {})
+    const base = collectVisitor()
+    base.deviceId = base.vid
+    base.deviceName = getDeviceName(base)
+    supabase.from('pageviews').insert({
+      path: window.location.pathname, ref: base.referrer,
+      meta: { ...base, visitId: _visitId, location: loc },
+    }).then(() => {}, () => {})
     return Promise.resolve()
   }
 
   // localStorage: update the current visit's entry in place.
+  const base = collectVisitor()
+  base.deviceId = base.vid
+  base.deviceName = getDeviceName(base)
+  const meta = { ...base, visitId: _visitId, location: loc }
   const arr = lsRead(PV_KEY)
   let idx = -1
   for (let i = arr.length - 1; i >= 0; i--) {
