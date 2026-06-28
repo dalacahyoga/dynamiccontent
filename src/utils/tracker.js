@@ -19,6 +19,29 @@ function lsWrite(key, arr) {
 
 const getDeviceName = (m) => `${m.platform || m.os || 'Unknown'} (${m.screen})`
 
+// Approximate location from the visitor's IP — no browser permission needed.
+// Used as a fallback when precise geolocation (GPS) is denied/unavailable.
+// City-level accuracy only. Returns { latitude, longitude, accuracy, source, city } or null.
+export async function getIpLocation() {
+  try {
+    const res = await fetch('https://ipwho.is/')
+    if (!res.ok) return null
+    const d = await res.json()
+    if (d && d.success !== false && typeof d.latitude === 'number' && typeof d.longitude === 'number') {
+      return {
+        latitude: d.latitude,
+        longitude: d.longitude,
+        accuracy: null,
+        source: 'ip',
+        city: [d.city, d.region, d.country].filter(Boolean).join(', '),
+      }
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
 // ---- writes (fire-and-forget) ----------------------------------------------
 // Guard against double counts (React StrictMode double-invokes effects in dev;
 // also fast back/forward). Same path within this window is recorded once.
@@ -45,20 +68,23 @@ export function trackUserAccess() {
     base.deviceId = base.vid
     base.deviceName = getDeviceName(base)
 
-    const finish = (location) => record({ ...base, location: location || null })
+    const recordWith = (location) => record({ ...base, location: location || null })
+    // Precise GPS denied/unavailable → fall back to approximate IP location.
+    const fallbackIp = async () => recordWith(await getIpLocation())
 
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => finish({
+        (pos) => recordWith({
           latitude: pos.coords.latitude,
           longitude: pos.coords.longitude,
           accuracy: pos.coords.accuracy,
+          source: 'gps',
         }),
-        () => finish(null),       // denied / unavailable
+        () => { fallbackIp() },   // denied / unavailable → IP fallback
         { timeout: 5000 },
       )
     } else {
-      finish(null)
+      fallbackIp()
     }
   } catch (e) {
     console.error('Error tracking user access:', e)
@@ -125,18 +151,25 @@ export async function getLocationPermission() {
 // (When permission was previously denied, the browser won't re-prompt.)
 export function captureLocation() {
   return new Promise((resolve) => {
-    if (!navigator.geolocation) { resolve(null); return }
+    // GPS denied/unavailable → fall back to approximate IP location.
+    const useIp = async () => {
+      const ip = await getIpLocation()
+      if (ip) { try { await saveLocationToVisit(ip) } catch { /* ignore */ } }
+      resolve(ip)
+    }
+    if (!navigator.geolocation) { useIp(); return }
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const loc = {
           latitude: pos.coords.latitude,
           longitude: pos.coords.longitude,
           accuracy: pos.coords.accuracy,
+          source: 'gps',
         }
         try { await saveLocationToVisit(loc) } catch { /* ignore */ }
         resolve(loc)
       },
-      () => resolve(null),
+      () => { useIp() },
       { timeout: 8000, enableHighAccuracy: true },
     )
   })

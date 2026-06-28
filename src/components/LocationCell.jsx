@@ -45,6 +45,7 @@ function LocationCell({ location }) {
       {mapsEmbed && (
         <div className="location-map">
           <iframe
+            key={mapsEmbed}
             title={`Peta lokasi ${locationName || `${lat}, ${lng}`}`}
             src={mapsEmbed}
             loading="lazy"
@@ -73,7 +74,11 @@ function LocationCell({ location }) {
         </a>
       )}
       <div className="location-accuracy">
-        <span className="table-secondary">Akurasi: ±{location.accuracy?.toFixed(0) || 'N/A'}m</span>
+        {location.source === 'ip' ? (
+          <span className="table-secondary">📡 Perkiraan via IP (akurasi level kota)</span>
+        ) : (
+          <span className="table-secondary">📍 GPS · akurasi ±{location.accuracy?.toFixed(0) || 'N/A'}m</span>
+        )}
       </div>
     </div>
   )
