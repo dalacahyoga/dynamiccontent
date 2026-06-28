@@ -67,6 +67,9 @@ create policy "alias update" on aliases for update to authenticated using (true)
 create policy "pv insert"  on pageviews for insert to anon, authenticated with check (true);
 create policy "pv read"    on pageviews for select to authenticated using (true);
 create policy "pv delete"  on pageviews for delete to authenticated using (true);
+-- anon boleh UPDATE baris kunjungannya sendiri (tombol "Lokasi" memperbarui
+-- lokasi di baris yang sama, bukan menambah baris baru)
+create policy "pv update"  on pageviews for update to anon, authenticated using (true) with check (true);
 
 create policy "ev insert"  on events for insert to anon, authenticated with check (true);
 create policy "ev read"    on events for select to authenticated using (true);

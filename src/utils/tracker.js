@@ -24,6 +24,12 @@ const getDeviceName = (m) => `${m.platform || m.os || 'Unknown'} (${m.screen})`
 // also fast back/forward). Same path within this window is recorded once.
 let _lastPV = { path: '', t: 0 }
 
+// A unique id for the CURRENT page view. Generated once per trackUserAccess so
+// later location updates (e.g. the "Lokasi" button) can UPDATE the same row
+// instead of inserting a duplicate.
+let _visitId = null
+const newVisitId = () => `v_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+
 // Records a page view. Tries to attach geolocation (with the user's permission)
 // before persisting so the admin "Pengunjung" tab can show a map link.
 export function trackUserAccess() {
@@ -33,6 +39,7 @@ export function trackUserAccess() {
     const now = Date.now()
     if (path === _lastPV.path && now - _lastPV.t < 2000) return
     _lastPV = { path, t: now }
+    _visitId = newVisitId()
 
     const base = collectVisitor()
     base.deviceId = base.vid
@@ -60,13 +67,45 @@ export function trackUserAccess() {
 
 function record(meta) {
   const path = window.location.pathname
+  const m = { ...meta, visitId: _visitId }
   if (supabaseEnabled) {
-    supabase.from('pageviews').insert({ path, ref: meta.referrer, meta }).then(() => {}, () => {})
+    supabase.from('pageviews').insert({ path, ref: m.referrer, meta: m }).then(() => {}, () => {})
     return
   }
   const arr = lsRead(PV_KEY)
-  arr.push({ path, ref: meta.referrer, meta, ts: Date.now() })
+  arr.push({ path, ref: m.referrer, meta: m, ts: Date.now() })
   lsWrite(PV_KEY, arr)
+}
+
+// Attach/refresh the location on the CURRENT visit's existing row (no new row).
+function saveLocationToVisit(loc) {
+  const base = collectVisitor()
+  base.deviceId = base.vid
+  base.deviceName = getDeviceName(base)
+  const meta = { ...base, visitId: _visitId, location: loc }
+
+  if (supabaseEnabled) {
+    if (_visitId) {
+      // Best-effort UPDATE of this visit's row. Requires an anon UPDATE policy
+      // on `pageviews` (see docs/SUPABASE_SETUP.md). Never inserts here, so the
+      // raw table keeps ONE row per visit even if the policy is missing.
+      return supabase.from('pageviews').update({ meta }).eq('meta->>visitId', _visitId).then(() => {}, () => {})
+    }
+    // No active visit to attach to (rare) → record a fresh view.
+    supabase.from('pageviews').insert({ path: window.location.pathname, ref: meta.referrer, meta }).then(() => {}, () => {})
+    return Promise.resolve()
+  }
+
+  // localStorage: update the current visit's entry in place.
+  const arr = lsRead(PV_KEY)
+  let idx = -1
+  for (let i = arr.length - 1; i >= 0; i--) {
+    if (arr[i].meta?.visitId === _visitId) { idx = i; break }
+  }
+  if (idx >= 0) arr[idx].meta = meta
+  else arr.push({ path: window.location.pathname, ref: meta.referrer, meta, ts: Date.now() })
+  lsWrite(PV_KEY, arr)
+  return Promise.resolve()
 }
 
 // Current geolocation permission state: 'granted' | 'prompt' | 'denied' | 'unknown'.
@@ -88,16 +127,13 @@ export function captureLocation() {
   return new Promise((resolve) => {
     if (!navigator.geolocation) { resolve(null); return }
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      async (pos) => {
         const loc = {
           latitude: pos.coords.latitude,
           longitude: pos.coords.longitude,
           accuracy: pos.coords.accuracy,
         }
-        const base = collectVisitor()
-        base.deviceId = base.vid
-        base.deviceName = getDeviceName(base)
-        record({ ...base, location: loc })
+        try { await saveLocationToVisit(loc) } catch { /* ignore */ }
         resolve(loc)
       },
       () => resolve(null),
