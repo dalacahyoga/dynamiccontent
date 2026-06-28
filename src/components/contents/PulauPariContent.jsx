@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { getLocationPermission, captureLocation, trackEvent } from '../../utils/tracker'
+import { getLocationPermission, captureLocation, trackEvent, isIOS } from '../../utils/tracker'
 import './PulauPariContent.css'
 
 // Stable Wikimedia Commons images (Special:FilePath needs no hash; ?width= resizes).
@@ -85,13 +85,19 @@ function PulauPariContent() {
     goTo(id)
   }
 
-  const onOpenMaps = () => {
+  const onOpenMaps = async () => {
     trackEvent('pp_open_maps', { label: 'Buka di Google Maps' })
     const dest = encodeURIComponent('Pulau Pari, Kepulauan Seribu, DKI Jakarta')
-    // Open Maps synchronously within the click gesture so iOS Safari doesn't
-    // block the popup. Capture/refresh location in the background.
-    window.open(`https://www.google.com/maps/search/?api=1&query=${dest}`, '_blank', 'noopener,noreferrer')
-    captureLocation()
+    if (isIOS()) {
+      window.open(`https://www.google.com/maps/search/?api=1&query=${dest}`, '_blank', 'noopener,noreferrer')
+      captureLocation()
+      return
+    }
+    const coords = await captureLocation()
+    const url = coords
+      ? `https://www.google.com/maps/dir/?api=1&origin=${coords.latitude},${coords.longitude}&destination=${dest}`
+      : `https://www.google.com/maps/search/?api=1&query=${dest}`
+    window.open(url, '_blank', 'noopener,noreferrer')
   }
 
   const closeBox = useCallback(() => setLightbox(null), [])

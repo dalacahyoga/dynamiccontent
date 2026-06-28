@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { getLocationPermission, captureLocation, trackEvent } from '../../utils/tracker'
+import { getLocationPermission, captureLocation, trackEvent, isIOS } from '../../utils/tracker'
 import './GunungKawiContent.css'
 
 // Stable Wikimedia Commons images (Special:FilePath needs no hash; ?width= resizes).
@@ -94,13 +94,22 @@ function GunungKawiContent() {
 
   // Location card: request the visitor's location again, then open Google Maps
   // with a route from their position to the temple (falls back to the temple pin).
-  const onOpenMaps = () => {
+  const onOpenMaps = async () => {
     trackEvent('gk_open_maps', { label: 'Buka di Google Maps' })
     const dest = encodeURIComponent('Pura Gunung Kawi Sebatu, Tegallalang, Gianyar, Bali')
-    // Open Maps synchronously within the click gesture so iOS Safari doesn't
-    // block the popup. Capture/refresh location in the background.
-    window.open(`https://www.google.com/maps/search/?api=1&query=${dest}`, '_blank', 'noopener,noreferrer')
-    captureLocation()
+    if (isIOS()) {
+      // iOS WebKit blocks window.open after await → open synchronously now,
+      // capture location in the background.
+      window.open(`https://www.google.com/maps/search/?api=1&query=${dest}`, '_blank', 'noopener,noreferrer')
+      captureLocation()
+      return
+    }
+    // Desktop: request location first, then direct (route from the user's spot).
+    const coords = await captureLocation()
+    const url = coords
+      ? `https://www.google.com/maps/dir/?api=1&origin=${coords.latitude},${coords.longitude}&destination=${dest}`
+      : `https://www.google.com/maps/search/?api=1&query=${dest}`
+    window.open(url, '_blank', 'noopener,noreferrer')
   }
 
   const closeBox = useCallback(() => setLightbox(null), [])

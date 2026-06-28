@@ -19,6 +19,14 @@ function lsWrite(key, arr) {
 
 const getDeviceName = (m) => `${m.platform || m.os || 'Unknown'} (${m.screen})`
 
+// iOS (incl. iPadOS, which reports as Macintosh). iOS WebKit blocks window.open
+// after an await, so callers open popups synchronously there.
+export const isIOS = () => {
+  const ua = navigator.userAgent || ''
+  return /iPad|iPhone|iPod/.test(ua) ||
+    (/Macintosh/.test(ua) && typeof navigator.maxTouchPoints === 'number' && navigator.maxTouchPoints > 1)
+}
+
 // Approximate location from the visitor's IP — no browser permission needed.
 // Used as a fallback when precise geolocation (GPS) is denied/unavailable.
 // City-level accuracy only. Returns { latitude, longitude, accuracy, source, city } or null.
