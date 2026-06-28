@@ -94,14 +94,13 @@ function GunungKawiContent() {
 
   // Location card: request the visitor's location again, then open Google Maps
   // with a route from their position to the temple (falls back to the temple pin).
-  const onOpenMaps = async () => {
+  const onOpenMaps = () => {
     trackEvent('gk_open_maps', { label: 'Buka di Google Maps' })
     const dest = encodeURIComponent('Pura Gunung Kawi Sebatu, Tegallalang, Gianyar, Bali')
-    const coords = await captureLocation() // re-asks + updates data if allowed
-    const url = coords
-      ? `https://www.google.com/maps/dir/?api=1&origin=${coords.latitude},${coords.longitude}&destination=${dest}`
-      : `https://www.google.com/maps/search/?api=1&query=${dest}`
-    window.open(url, '_blank', 'noopener,noreferrer')
+    // Open Maps synchronously within the click gesture so iOS Safari doesn't
+    // block the popup. Capture/refresh location in the background.
+    window.open(`https://www.google.com/maps/search/?api=1&query=${dest}`, '_blank', 'noopener,noreferrer')
+    captureLocation()
   }
 
   const closeBox = useCallback(() => setLightbox(null), [])

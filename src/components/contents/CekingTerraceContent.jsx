@@ -89,14 +89,13 @@ function CekingTerraceContent() {
     goTo(id)
   }
 
-  const onOpenMaps = async () => {
+  const onOpenMaps = () => {
     trackEvent('ck_open_maps', { label: 'Buka di Google Maps' })
     const dest = encodeURIComponent('Tegalalang Rice Terrace, Tegalalang, Gianyar, Bali')
-    const coords = await captureLocation()
-    const url = coords
-      ? `https://www.google.com/maps/dir/?api=1&origin=${coords.latitude},${coords.longitude}&destination=${dest}`
-      : `https://www.google.com/maps/search/?api=1&query=${dest}`
-    window.open(url, '_blank', 'noopener,noreferrer')
+    // Open Maps synchronously within the click gesture so iOS Safari doesn't
+    // block the popup. Capture/refresh location in the background.
+    window.open(`https://www.google.com/maps/search/?api=1&query=${dest}`, '_blank', 'noopener,noreferrer')
+    captureLocation()
   }
 
   const closeBox = useCallback(() => setLightbox(null), [])
