@@ -11,7 +11,7 @@ import './App.css'
 
 function App() {
   const location = useLocation()
-  const isAdminPage = location.pathname.startsWith('/administrator')
+  const isAdminPage = location.pathname.startsWith('/admin')
   const [showTimnas, setShowTimnas] = useState(false)
   const [showPulauSeribu, setShowPulauSeribu] = useState(false)
 
@@ -48,8 +48,8 @@ function App() {
         ) : (
           <Route path="/pulau-seribu" element={<Navigate to="/" replace />} />
         )}
-        <Route path="/administrator" element={<Login />} />
-        <Route path="/administrator/dashboard" element={<Dashboard />} />
+        <Route path="/admin" element={<Login />} />
+        <Route path="/admin/dashboard" element={<Dashboard />} />
       </Routes>
     </>
   )

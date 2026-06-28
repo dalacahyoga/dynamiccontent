@@ -1,4 +1,9 @@
-// Content management utilities
+// Content management utilities.
+// The active content selection is shared across all visitors via the Supabase
+// `content` table (single row, id = 1, data = { active: '<option>' }), with a
+// localStorage cache so the site renders synchronously before the network call.
+import { supabase, supabaseEnabled } from '../config/supabase'
+
 export const CONTENT_OPTIONS = {
   NONE: 'none',
   TIMNAS: 'timnas',
@@ -10,12 +15,14 @@ export const CONTENT_OPTIONS = {
   BOTH: 'both' // Kept for backward compatibility, but not used in UI
 }
 
+const CACHE_KEY = 'activeContent'
+
 export const getActiveContent = () => {
   try {
-    const content = localStorage.getItem('activeContent')
+    const content = localStorage.getItem(CACHE_KEY)
     // Auto-convert old BOTH option to NONE
     if (content === CONTENT_OPTIONS.BOTH) {
-      localStorage.setItem('activeContent', CONTENT_OPTIONS.NONE)
+      localStorage.setItem(CACHE_KEY, CONTENT_OPTIONS.NONE)
       return CONTENT_OPTIONS.NONE
     }
     return content || CONTENT_OPTIONS.NONE
@@ -25,36 +32,32 @@ export const getActiveContent = () => {
   }
 }
 
-// Sync content from cloud (for auto-update across devices)
-// Works even if JSONBin.io is not fully initialized (just needs bin ID)
+// Pull the latest active content from Supabase into the local cache. Returns the
+// new value when it differs from the cached one, otherwise null. Safe to call
+// when Supabase is not configured (resolves to null).
 export const syncContentFromCloud = async () => {
+  if (!supabaseEnabled) return null
   try {
-    const { getContentFromCloud, getBinId } = await import('./jsonbinStorage')
-    
-    // Check if content bin ID exists (even without API key, we can try to read)
-    const contentBinId = localStorage.getItem('jsonbinContentBinId')
-    const logsBinId = getBinId()
-    
-    // If no bin ID at all, can't sync
-    if (!contentBinId && !logsBinId) {
-      return null
+    const { data, error } = await supabase
+      .from('content').select('data').eq('id', 1).maybeSingle()
+    if (error || !data?.data) return null
+    const cloud = data.data.active
+    if (!cloud) return null
+    const current = getActiveContent()
+    if (cloud !== current) {
+      localStorage.setItem(CACHE_KEY, cloud)
+      return cloud
     }
-    
-    const cloudContent = await getContentFromCloud()
-    if (cloudContent) {
-      const currentContent = getActiveContent()
-      if (cloudContent !== currentContent) {
-        // Update localStorage if cloud has different content
-        localStorage.setItem('activeContent', cloudContent)
-        return cloudContent
-      }
-    }
-    
     return null
   } catch (error) {
     console.warn('Error syncing content from cloud:', error)
     return null
   }
+}
+
+// Preload content into the cache BEFORE the app renders (called from main.jsx).
+export const preloadContent = async () => {
+  await syncContentFromCloud()
 }
 
 export const setActiveContent = async (content) => {
@@ -64,23 +67,18 @@ export const setActiveContent = async (content) => {
       console.warn('BOTH option is no longer supported. Please select a single content.')
       return false
     }
-    
-    // Save to localStorage
-    localStorage.setItem('activeContent', content)
-    
-    // Sync to cloud if JSONBin.io is initialized
-    try {
-      const { isInitialized, saveContentToCloud } = await import('./jsonbinStorage')
-      if (isInitialized()) {
-        // Sync in background (don't wait for it)
-        saveContentToCloud(content).catch(err => {
-          console.warn('Failed to sync content to cloud:', err)
-        })
-      }
-    } catch (error) {
-      // JSONBin not available, continue silently
+
+    // Save to cache immediately so the UI updates instantly
+    localStorage.setItem(CACHE_KEY, content)
+
+    // Share across all visitors via Supabase
+    if (supabaseEnabled) {
+      const { error } = await supabase
+        .from('content')
+        .upsert({ id: 1, data: { active: content }, updated_at: new Date().toISOString() })
+      if (error) throw error
     }
-    
+
     return true
   } catch (error) {
     console.error('Error setting active content:', error)
@@ -90,52 +88,14 @@ export const setActiveContent = async (content) => {
 
 export const isContentActive = (contentType) => {
   const active = getActiveContent()
-  if (active === CONTENT_OPTIONS.BOTH) {
-    return true
-  }
-  if (active === CONTENT_OPTIONS.TIMNAS && contentType === 'timnas') {
-    return true
-  }
-  if (active === CONTENT_OPTIONS.PULAU_SERIBU && contentType === 'pulau-seribu') {
-    return true
-  }
-  if (active === CONTENT_OPTIONS.GUNUNG_KAWI && contentType === 'gunung-kawi') {
-    return true
-  }
-  if (active === CONTENT_OPTIONS.MALAKA_PROJECT && contentType === 'malaka-project') {
-    return true
-  }
-  if (active === CONTENT_OPTIONS.CEKING_TERRACE && contentType === 'ceking-terrace') {
-    return true
-  }
-  return false
+  if (active === CONTENT_OPTIONS.BOTH) return true
+  return active === contentType
 }
 
 export const shouldShowInNavigation = (contentType) => {
   const active = getActiveContent()
-  if (active === CONTENT_OPTIONS.NONE) {
-    return false
-  }
-  // BOTH option removed - only single content allowed
-  // if (active === CONTENT_OPTIONS.BOTH) {
-  //   return true
-  // }
-  if (active === CONTENT_OPTIONS.TIMNAS && contentType === 'timnas') {
-    return true
-  }
-  if (active === CONTENT_OPTIONS.PULAU_SERIBU && contentType === 'pulau-seribu') {
-    return true
-  }
-  if (active === CONTENT_OPTIONS.GUNUNG_KAWI && contentType === 'gunung-kawi') {
-    return true
-  }
-  if (active === CONTENT_OPTIONS.MALAKA_PROJECT && contentType === 'malaka-project') {
-    return true
-  }
-  if (active === CONTENT_OPTIONS.CEKING_TERRACE && contentType === 'ceking-terrace') {
-    return true
-  }
-  return false
+  if (active === CONTENT_OPTIONS.NONE) return false
+  return active === contentType
 }
 
 export const getContentLabel = (contentType) => {

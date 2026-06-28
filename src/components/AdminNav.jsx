@@ -41,6 +41,12 @@ function AdminNav({ activeTab, onTabChange, onLogout }) {
             👥 Daftar Pengunjung
           </button>
           <button
+            className={`nav-item ${activeTab === 'events' ? 'active' : ''}`}
+            onClick={() => handleTabClick('events')}
+          >
+            📈 Event Tracker
+          </button>
+          <button
             className="nav-item logout-item"
             onClick={handleLogout}
           >
@@ -69,6 +75,12 @@ function AdminNav({ activeTab, onTabChange, onLogout }) {
           onClick={() => handleTabClick('visitors')}
         >
           👥 Daftar Pengunjung
+        </button>
+        <button
+          className={`mobile-nav-item ${activeTab === 'events' ? 'active' : ''}`}
+          onClick={() => handleTabClick('events')}
+        >
+          📈 Event Tracker
         </button>
         <button
           className="mobile-nav-item logout-item"

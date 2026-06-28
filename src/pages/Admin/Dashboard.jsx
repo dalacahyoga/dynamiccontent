@@ -1,577 +1,382 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getUserAccessLogs, clearUserAccessLogs, exportLogs, importLogs } from '../../utils/tracker'
-import { getActiveContent, setActiveContent, CONTENT_OPTIONS, getContentLabel, syncContentFromCloud } from '../../utils/contentManager'
-import { initializeBin, syncLogs, isInitialized, getApiKey, getBinId, initializeContentBin } from '../../utils/jsonbinStorage'
-import { saveSharedConfig } from '../../utils/sharedConfig'
-import { getConfigApiKey } from '../../config/jsonbin'
+import {
+  visitorReport, eventReport, eventLabel, setAlias, deleteVisitor, clearAnalytics, trackEvent,
+} from '../../utils/tracker'
+import {
+  getActiveContent, setActiveContent, CONTENT_OPTIONS, getContentLabel, syncContentFromCloud,
+} from '../../utils/contentManager'
+import { supabase, supabaseEnabled, sourceLabel } from '../../config/supabase'
 import AdminNav from '../../components/AdminNav'
 import LocationCell from '../../components/LocationCell'
 import './Admin.css'
 
+const fmt = (ts) => (ts ? new Date(ts).toLocaleString('id-ID') : '—')
+
+const CONTENT_LIST = [
+  { id: CONTENT_OPTIONS.NONE, icon: '🚫', title: 'Tidak Ada Konten', desc: 'Halaman home kosong' },
+  { id: CONTENT_OPTIONS.TIMNAS, icon: '⚽', title: 'Timnas Indonesia', desc: 'Konten tentang Timnas Indonesia' },
+  { id: CONTENT_OPTIONS.PULAU_SERIBU, icon: '🏝️', title: 'Pulau Seribu', desc: 'Konten tentang Pulau Seribu' },
+  { id: CONTENT_OPTIONS.GUNUNG_KAWI, icon: '⛰️', title: 'Gunung Kawi Sebatu', desc: 'Pura Air yang Indah di Gianyar, Bali' },
+  { id: CONTENT_OPTIONS.MALAKA_PROJECT, icon: '🏗️', title: 'Malaka Project', desc: 'Inovasi dan Pembangunan Berkelanjutan' },
+  { id: CONTENT_OPTIONS.CEKING_TERRACE, icon: '🌾', title: 'Ceking Terrace', desc: 'Keindahan Terasering Sawah di Ubud, Bali' },
+]
+
 function Dashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [userLogs, setUserLogs] = useState([])
-  const [activeContent, setActiveContentState] = useState(CONTENT_OPTIONS.NONE)
+  const [ready, setReady] = useState(false)
   const [activeTab, setActiveTab] = useState('content')
-  const [jsonbinInitialized, setJsonbinInitialized] = useState(false)
-  const [apiKey, setApiKey] = useState('')
-  const [syncing, setSyncing] = useState(false)
-  const [syncStatus, setSyncStatus] = useState(null)
-  const fileInputRef = useRef(null)
   const navigate = useNavigate()
-
-  // Function to load logs from cloud
-  const loadLogsFromCloud = async () => {
-    if (!isInitialized()) return
-
-    try {
-      // Sync logs (merge local and cloud)
-      await syncLogs()
-      
-      // Reload logs after sync
-      const logs = getUserAccessLogs()
-      setUserLogs(logs)
-    } catch (error) {
-      console.warn('Failed to load logs from cloud:', error)
-      // Fallback to local storage
-      const logs = getUserAccessLogs()
-      setUserLogs(logs)
-    }
-  }
 
   useEffect(() => {
     document.title = 'Administrator Dashboard | Portal Indonesia'
-    
-    // Check authentication
-    const loggedIn = localStorage.getItem('adminLoggedIn') === 'true'
-    if (!loggedIn) {
-      navigate('/administrator')
-      return
-    }
 
-    setIsAuthenticated(true)
-
-    // Load active content
-    const content = getActiveContent()
-    setActiveContentState(content)
-
-    // Check JSONBin.io status
-    const initialized = isInitialized()
-    setJsonbinInitialized(initialized)
-    if (initialized) {
-      setApiKey(getApiKey())
-      // Auto-fetch logs from cloud on load
-      loadLogsFromCloud()
-      // Sync content from cloud on load
-      syncContentFromCloud().then(newContent => {
-        if (newContent) {
-          setActiveContentState(newContent)
-          window.dispatchEvent(new Event('contentChanged'))
-        }
+    if (supabaseEnabled) {
+      supabase.auth.getSession().then(({ data }) => {
+        if (data.session) { setIsAuthenticated(true); setReady(true) }
+        else navigate('/admin')
       })
+      const { data } = supabase.auth.onAuthStateChange((_e, session) => {
+        if (!session) navigate('/admin')
+      })
+      return () => data.subscription?.unsubscribe()
+    }
+
+    if (localStorage.getItem('adminLoggedIn') === 'true') {
+      setIsAuthenticated(true); setReady(true)
     } else {
-      // Load from localStorage only if not using cloud
-      const logs = getUserAccessLogs()
-      setUserLogs(logs)
-    }
-    
-    // Auto-sync content every 5 seconds if JSONBin is initialized
-    let contentSyncInterval
-    if (initialized) {
-      contentSyncInterval = setInterval(async () => {
-        const newContent = await syncContentFromCloud()
-        if (newContent) {
-          const currentContent = getActiveContent()
-          if (newContent !== currentContent) {
-            setActiveContentState(newContent)
-            window.dispatchEvent(new Event('contentChanged'))
-          }
-        }
-      }, 5000) // Sync every 5 seconds
-    }
-    
-    return () => {
-      if (contentSyncInterval) {
-        clearInterval(contentSyncInterval)
-      }
-    }
-
-    // Set up polling for auto-refresh (every 10 seconds)
-    let pollInterval
-    if (initialized) {
-      pollInterval = setInterval(() => {
-        loadLogsFromCloud()
-      }, 10000) // Poll every 10 seconds
-    }
-
-    return () => {
-      if (pollInterval) {
-        clearInterval(pollInterval)
-      }
+      navigate('/admin')
     }
   }, [navigate])
 
-  const handleClearLogs = async () => {
-    if (window.confirm('Apakah Anda yakin ingin menghapus semua log akses pengguna?')) {
-      await clearUserAccessLogs()
-      setUserLogs([])
-      if (isInitialized()) {
-        // Reload to sync empty state
-        await loadLogsFromCloud()
-      }
+  const handleLogout = async () => {
+    if (supabaseEnabled) await supabase.auth.signOut()
+    else {
+      localStorage.removeItem('adminLoggedIn')
+      localStorage.removeItem('adminLoginTime')
     }
+    navigate('/admin')
   }
 
-  const handleRefreshLogs = async () => {
-    if (isInitialized()) {
-      // If using cloud, sync first
-      await loadLogsFromCloud()
-    } else {
-      // Otherwise just load from local
-      const logs = getUserAccessLogs()
-      setUserLogs(logs)
-      const devices = getAllDevicesLogs()
-      setDevicesSummary(devices)
-    }
-  }
-
-  const handleExportLogs = () => {
-    if (exportLogs()) {
-      alert('Log berhasil diekspor!')
-    } else {
-      alert('Gagal mengekspor log')
-    }
-  }
-
-  const handleImportLogs = async (event) => {
-    const file = event.target.files[0]
-    if (!file) return
-
-    try {
-      const result = await importLogs(file)
-      alert(`Import berhasil! ${result.imported} log baru ditambahkan. Total: ${result.total} log`)
-      handleRefreshLogs()
-    } catch (error) {
-      alert(`Gagal mengimpor log: ${error.message}`)
-    }
-    
-    // Reset file input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
-    }
-  }
-
-  const handleSetupJsonbin = async () => {
-    // API key sudah di-hardcode, langsung pakai dari config
-    const apiKey = getConfigApiKey()
-    
-    if (!apiKey) {
-      alert('API key tidak ditemukan. Pastikan API key sudah di-hardcode di src/config/jsonbin.js')
-      return
-    }
-
-    try {
-      setSyncing(true)
-      const logsBinId = await initializeBin(apiKey)
-      // Also initialize content bin for content settings sync
-      const contentBinId = await initializeContentBin(apiKey)
-      setJsonbinInitialized(true)
-      
-      // Save shared config
-      saveSharedConfig(apiKey, logsBinId, contentBinId)
-      
-      // Save current content to cloud immediately after setup
-      const currentContent = getActiveContent()
-      const { saveContentToCloud } = await import('../../utils/jsonbinStorage')
-      await saveContentToCloud(currentContent)
-      
-      // Tampilkan bin IDs untuk di-copy dan hardcode
-      const binIdsText = `export const JSONBIN_LOGS_BIN_ID = "${logsBinId}"
-export const JSONBIN_CONTENT_BIN_ID = "${contentBinId}"`
-      
-      navigator.clipboard.writeText(binIdsText).then(() => {
-        alert('✅ JSONBin.io berhasil di-setup!\n\n📋 Bin IDs sudah di-copy ke clipboard.\n\nPaste di src/config/jsonbin.js agar semua device menggunakan bins yang sama.')
-      }).catch(() => {
-        alert('✅ JSONBin.io berhasil di-setup!\n\n📋 Copy bin IDs ini:\n\nLogs Bin ID: ' + logsBinId + '\nContent Bin ID: ' + contentBinId + '\n\nPaste di src/config/jsonbin.js')
-      })
-      // Auto load logs after setup
-      await loadLogsFromCloud()
-      // Sync content from cloud
-      await syncContentFromCloud().then(newContent => {
-        if (newContent) {
-          setActiveContentState(newContent)
-          window.dispatchEvent(new Event('contentChanged'))
-        }
-      })
-      
-      // Restart polling
-      const pollInterval = setInterval(() => {
-        loadLogsFromCloud()
-      }, 10000)
-      
-      // Store interval ID for cleanup (optional, bisa di-handle di useEffect)
-    } catch (error) {
-      alert(`Gagal setup JSONBin.io: ${error.message}`)
-    } finally {
-      setSyncing(false)
-    }
-  }
-
-  const handleContentChange = async (contentType) => {
-    const success = await setActiveContent(contentType)
-    if (success) {
-      setActiveContentState(contentType)
-      // Dispatch custom event to notify other components
-      window.dispatchEvent(new Event('contentChanged'))
-      alert(`Konten berhasil diubah menjadi: ${getContentLabel(contentType)}. Perubahan akan tersinkronisasi ke semua device.`)
-    } else {
-      alert('Gagal mengubah konten')
-    }
-  }
-
-  const handleLogout = () => {
-    localStorage.removeItem('adminLoggedIn')
-    localStorage.removeItem('adminLoginTime')
-    navigate('/administrator')
-  }
-
-  if (!isAuthenticated) {
-    return null
-  }
+  if (!ready || !isAuthenticated) return null
 
   return (
     <div className="admin-container">
       <AdminNav activeTab={activeTab} onTabChange={setActiveTab} onLogout={handleLogout} />
       <div className="dashboard-container">
-        {/* Warning Banner if JSONBin.io not initialized */}
-        {!jsonbinInitialized && (
-          <div className="warning-banner" style={{
-            background: 'linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%)',
-            color: 'white',
-            padding: '1rem 1.5rem',
-            marginBottom: '1.5rem',
-            borderRadius: '8px',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem'
-          }}>
-            <div style={{ fontSize: '2rem' }}>⚠️</div>
-            <div style={{ flex: 1 }}>
-              <strong style={{ fontSize: '1.1rem', display: 'block', marginBottom: '0.5rem' }}>
-                Cloud Sync Belum Diaktifkan!
-              </strong>
-              <p style={{ margin: 0, fontSize: '0.95rem' }}>
-                Log dan pengaturan konten hanya tersimpan di browser ini. Untuk melihat log dari device lain dan sync konten antar device, 
-                <strong> silakan setup JSONBin.io di tab "👥 Daftar Pengunjung"</strong>
+        {!supabaseEnabled && (
+          <div className="warning-banner">
+            <div className="warning-banner__icon">⚠️</div>
+            <div className="warning-banner__text">
+              <strong>Mode Lokal (tanpa cloud sync)</strong>
+              <p>
+                Supabase belum dikonfigurasi, jadi data hanya tersimpan di browser ini dan tidak terlihat
+                dari device lain. Set <code>VITE_SUPABASE_URL</code> dan <code>VITE_SUPABASE_ANON_KEY</code>{' '}
+                (lihat <code>docs/SUPABASE_SETUP.md</code>) untuk mengaktifkan cloud sync.
               </p>
             </div>
-            <button
-              onClick={() => setActiveTab('visitors')}
-              style={{
-                background: 'white',
-                color: '#ff6b6b',
-                border: 'none',
-                padding: '0.6rem 1.2rem',
-                borderRadius: '6px',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                fontSize: '0.9rem'
-              }}
-            >
-              Setup Sekarang →
-            </button>
           </div>
         )}
+
         <div className="dashboard-header">
           <div>
             <h1>📊 Administrator Dashboard</h1>
-            <p>Portal Indonesia - Data Monitoring</p>
+            <p>Portal Indonesia · sumber data: {sourceLabel}</p>
           </div>
         </div>
 
         <div className="dashboard-content">
-          {activeTab === 'content' && (
-            <section className="data-section">
-              <h2>⚙️ Pengaturan Konten Home</h2>
-            <div className="data-card">
-              <div className="content-selector">
-                <p className="selector-label">Pilih konten yang akan ditampilkan di halaman home:</p>
-                <div className="content-options">
-                  <button
-                    onClick={() => handleContentChange(CONTENT_OPTIONS.NONE)}
-                    className={`content-option ${activeContent === CONTENT_OPTIONS.NONE ? 'active' : ''}`}
-                  >
-                    <div className="option-icon">🚫</div>
-                    <div className="option-text">
-                      <div className="option-title">Tidak Ada Konten</div>
-                      <div className="option-desc">Halaman home kosong</div>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => handleContentChange(CONTENT_OPTIONS.TIMNAS)}
-                    className={`content-option ${activeContent === CONTENT_OPTIONS.TIMNAS ? 'active' : ''}`}
-                  >
-                    <div className="option-icon">⚽</div>
-                    <div className="option-text">
-                      <div className="option-title">Timnas Indonesia</div>
-                      <div className="option-desc">Konten tentang Timnas Indonesia</div>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => handleContentChange(CONTENT_OPTIONS.PULAU_SERIBU)}
-                    className={`content-option ${activeContent === CONTENT_OPTIONS.PULAU_SERIBU ? 'active' : ''}`}
-                  >
-                    <div className="option-icon">🏝️</div>
-                    <div className="option-text">
-                      <div className="option-title">Pulau Seribu</div>
-                      <div className="option-desc">Konten tentang Pulau Seribu</div>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => handleContentChange(CONTENT_OPTIONS.GUNUNG_KAWI)}
-                    className={`content-option ${activeContent === CONTENT_OPTIONS.GUNUNG_KAWI ? 'active' : ''}`}
-                  >
-                    <div className="option-icon">⛰️</div>
-                    <div className="option-text">
-                      <div className="option-title">Gunung Kawi Sebatu</div>
-                      <div className="option-desc">Pura Air yang Indah di Gianyar, Bali</div>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => handleContentChange(CONTENT_OPTIONS.MALAKA_PROJECT)}
-                    className={`content-option ${activeContent === CONTENT_OPTIONS.MALAKA_PROJECT ? 'active' : ''}`}
-                  >
-                    <div className="option-icon">🏗️</div>
-                    <div className="option-text">
-                      <div className="option-title">Malaka Project</div>
-                      <div className="option-desc">Inovasi dan Pembangunan Berkelanjutan</div>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => handleContentChange(CONTENT_OPTIONS.CEKING_TERRACE)}
-                    className={`content-option ${activeContent === CONTENT_OPTIONS.CEKING_TERRACE ? 'active' : ''}`}
-                  >
-                    <div className="option-icon">🌾</div>
-                    <div className="option-text">
-                      <div className="option-title">Ceking Terrace</div>
-                      <div className="option-desc">Keindahan Terasering Sawah di Ubud, Bali</div>
-                    </div>
-                  </button>
-                </div>
-                <div className="current-content-info">
-                  <strong>Konten Aktif:</strong> {getContentLabel(activeContent)}
-                </div>
-              </div>
-            </div>
-            </section>
-          )}
-
-          {activeTab === 'visitors' && (
-            <section className="data-section">
-              {/* JSONBin.io Setup */}
-              <div className="jsonbin-setup">
-                <h3>☁️ Cloud Sync (JSONBin.io)</h3>
-                {!jsonbinInitialized ? (
-                  <div className="setup-card">
-                    <div className="warning-box">
-                      <strong>⚠️ PENTING:</strong> Tanpa setup JSONBin.io, log dari device lain (A, B, C) 
-                      <strong> TIDAK AKAN muncul</strong> di dashboard ini. Hanya log dari device ini yang terlihat.
-                    </div>
-                    <p className="setup-info">
-                      API key sudah di-hardcode. Klik tombol di bawah untuk setup bins.
-                    </p>
-                    <div style={{ 
-                      padding: '0.8rem', 
-                      background: '#f0f9ff', 
-                      borderRadius: '6px', 
-                      marginBottom: '1rem',
-                      fontSize: '0.9rem'
-                    }}>
-                      <strong>API Key:</strong> <code style={{ 
-                        background: 'white', 
-                        padding: '0.2rem 0.4rem', 
-                        borderRadius: '3px',
-                        fontSize: '0.85rem'
-                      }}>{getConfigApiKey()?.substring(0, 30)}...</code>
-                    </div>
-                    <button 
-                      onClick={handleSetupJsonbin} 
-                      className="setup-button"
-                      disabled={syncing}
-                      style={{ width: '100%' }}
-                    >
-                      {syncing ? '🔄 Setting up...' : '✅ Setup JSONBin.io (Auto dengan API Key)'}
-                    </button>
-                    <p style={{ marginTop: '1rem', fontSize: '0.85rem', color: '#059669' }}>
-                      ✅ Semua device (B, C, dst) akan otomatis menggunakan API key yang sama tanpa perlu setup manual.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="sync-card">
-                    <div className="sync-status">
-                      <span className="status-badge success">✓ Terhubung & Auto-Sync Aktif</span>
-                      <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                        <span className="bin-id">Logs Bin ID: {getBinId()}</span>
-                        <span className="bin-id">Content Bin ID: {localStorage.getItem('jsonbinContentBinId') || 'N/A'}</span>
-                        <button
-                          onClick={() => {
-                            const logsBinId = getBinId()
-                            const contentBinId = localStorage.getItem('jsonbinContentBinId')
-                            const text = `export const JSONBIN_LOGS_BIN_ID = "${logsBinId}"
-export const JSONBIN_CONTENT_BIN_ID = "${contentBinId}"`
-                            navigator.clipboard.writeText(text)
-                            alert('Bin IDs copied! Paste di src/config/jsonbin.js')
-                          }}
-                          style={{
-                            marginTop: '0.5rem',
-                            padding: '0.4rem 0.8rem',
-                            background: '#3b82f6',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '0.85rem'
-                          }}
-                        >
-                          📋 Copy Bin IDs untuk Hardcode
-                        </button>
-                        <div style={{ 
-                          marginTop: '0.5rem', 
-                          padding: '0.8rem', 
-                          background: '#fef3c7', 
-                          borderRadius: '6px',
-                          fontSize: '0.85rem',
-                          color: '#92400e'
-                        }}>
-                          <strong>⚠️ PENTING:</strong> Setelah copy bin IDs, paste di src/config/jsonbin.js agar semua device menggunakan bins yang sama.
-                        </div>
-                      </div>
-                    </div>
-                    <div className="auto-sync-info">
-                      <p>✅ Log otomatis tersinkronisasi setiap 10 detik</p>
-                      <p>✅ Log dari semua device otomatis muncul tanpa perlu manual sync</p>
-                      <p>✅ Konten otomatis tersinkronisasi setiap 5 detik</p>
-                    </div>
-                    <div style={{ marginTop: '1rem', padding: '1rem', background: '#f0f9ff', borderRadius: '6px', border: '1px solid #bae6fd' }}>
-                      <strong style={{ color: '#0369a1', display: 'block', marginBottom: '0.5rem' }}>
-                        📋 Info untuk Device Lain:
-                      </strong>
-                      <p style={{ margin: '0.5rem 0', fontSize: '0.9rem', color: '#0369a1' }}>
-                        Device lain (B, C, dll) juga perlu setup dengan <strong>API key yang sama</strong> untuk sync bekerja.
-                      </p>
-                      <p style={{ margin: '0.5rem 0', fontSize: '0.85rem', color: '#075985' }}>
-                        API Key: <code style={{ background: 'white', padding: '0.2rem 0.4rem', borderRadius: '3px' }}>{getApiKey()?.substring(0, 20)}...</code>
-                      </p>
-                    </div>
-                    <button 
-                      onClick={handleRefreshLogs} 
-                      className="sync-button"
-                      disabled={syncing}
-                    >
-                      {syncing ? '🔄 Loading...' : '🔄 Refresh Sekarang'}
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <div className="section-header">
-                <h2>👥 Daftar User yang Mengakses Website</h2>
-              <div className="section-actions">
-                <button onClick={handleExportLogs} className="export-button">
-                  📥 Export Log
-                </button>
-                <label className="import-button">
-                  📤 Import Log
-                  <input
-                    type="file"
-                    accept=".json"
-                    onChange={handleImportLogs}
-                    ref={fileInputRef}
-                    style={{ display: 'none' }}
-                  />
-                </label>
-                <button onClick={handleRefreshLogs} className="refresh-button">
-                  🔄 Refresh
-                </button>
-                <button onClick={handleClearLogs} className="clear-button">
-                  🗑️ Hapus Semua
-                </button>
-              </div>
-            </div>
-            <div className="data-card">
-              {userLogs.length > 0 ? (
-                <div className="table-container">
-                  <table className="user-table">
-                    <thead>
-                      <tr>
-                        <th>No</th>
-                        <th>Device</th>
-                        <th>Waktu Akses</th>
-                        <th>Platform</th>
-                        <th>Lokasi</th>
-                        <th>Screen</th>
-                        <th>Referrer</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {userLogs.map((log, index) => (
-                        <tr key={log.id}>
-                          <td>{index + 1}</td>
-                          <td>
-                            <div className="table-cell-content">
-                              <div className="table-primary">{log.deviceName || 'Unknown Device'}</div>
-                              <div className="table-secondary">{log.deviceId ? log.deviceId.substring(0, 15) + '...' : 'N/A'}</div>
-                            </div>
-                          </td>
-                          <td>
-                            <div className="table-cell-content">
-                              <div className="table-primary">{log.date}</div>
-                              <div className="table-secondary">{log.timezone}</div>
-                            </div>
-                          </td>
-                          <td>
-                            <div className="table-cell-content">
-                              <div className="table-primary">{log.platform}</div>
-                              <div className="table-secondary">{log.online ? '🟢 Online' : '🔴 Offline'}</div>
-                            </div>
-                          </td>
-                          <td>
-                            <LocationCell location={log.location} />
-                          </td>
-                          <td>
-                            <div className="table-cell-content">
-                              <div className="table-primary">{log.screenWidth} × {log.screenHeight}</div>
-                              <div className="table-secondary">Window: {log.windowWidth} × {log.windowHeight}</div>
-                            </div>
-                          </td>
-                          <td>
-                            <div className="table-cell-content">
-                              <div className="table-primary small-text">
-                                {log.referrer.length > 40 ? log.referrer.substring(0, 40) + '...' : log.referrer}
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="empty-state">
-                  <p>Belum ada data akses pengguna</p>
-                  <p className="empty-hint">Data akan muncul setelah pengguna mengakses website</p>
-                </div>
-              )}
-            </div>
-            </section>
-          )}
+          {activeTab === 'content' && <EditContent />}
+          {activeTab === 'visitors' && <Visitors />}
+          {activeTab === 'events' && <EventsTab />}
         </div>
       </div>
     </div>
   )
 }
 
-export default Dashboard
+// ---- Tab: Pengaturan Konten -----------------------------------------------
+function EditContent() {
+  const [active, setActive] = useState(getActiveContent())
+  const [status, setStatus] = useState('')
 
+  useEffect(() => {
+    syncContentFromCloud().then((c) => { if (c) setActive(c) })
+    const id = setInterval(async () => {
+      const c = await syncContentFromCloud()
+      if (c) setActive(c)
+    }, 5000)
+    return () => clearInterval(id)
+  }, [])
+
+  const choose = async (contentType) => {
+    const ok = await setActiveContent(contentType)
+    if (ok) {
+      setActive(contentType)
+      window.dispatchEvent(new Event('contentChanged'))
+      trackEvent('content_change', { label: getContentLabel(contentType) })
+      setStatus(`✔ Konten aktif: ${getContentLabel(contentType)}` + (supabaseEnabled ? ' (tersinkron ke semua device)' : ' (lokal)'))
+    } else {
+      setStatus('✖ Gagal mengubah konten')
+    }
+  }
+
+  return (
+    <section className="admin-panel">
+      <div className="admin-panel__head">
+        <h2>⚙️ Pengaturan Konten Home</h2>
+        <p className="admin-note">Pilih satu konten yang akan ditampilkan di halaman home. Perubahan langsung tersinkron ke semua pengunjung.</p>
+      </div>
+      <div className="content-options">
+        {CONTENT_LIST.map((c) => (
+          <button
+            key={c.id}
+            onClick={() => choose(c.id)}
+            className={`content-option ${active === c.id ? 'active' : ''}`}
+          >
+            <div className="option-icon">{c.icon}</div>
+            <div className="option-text">
+              <div className="option-title">{c.title}</div>
+              <div className="option-desc">{c.desc}</div>
+            </div>
+          </button>
+        ))}
+      </div>
+      <div className="current-content-info">
+        <strong>Konten Aktif:</strong> {getContentLabel(active)}
+        {status && <span className="admin-saved"> · {status}</span>}
+      </div>
+    </section>
+  )
+}
+
+// ---- generic async report loader ------------------------------------------
+function useReport(reportFn) {
+  const [state, setState] = useState({ loading: true, error: '', data: null })
+  const load = useCallback(async () => {
+    setState((s) => ({ ...s, loading: true, error: '' }))
+    try { setState({ loading: false, error: '', data: await reportFn() }) }
+    catch { setState({ loading: false, error: 'Gagal memuat data.', data: null }) }
+  }, [reportFn])
+  useEffect(() => { load() }, [load])
+  return { ...state, reload: load }
+}
+
+function CountTable({ head, rows }) {
+  if (!rows?.length) return <p className="admin-empty">—</p>
+  return (
+    <div className="table-container">
+      <table className="user-table">
+        <thead><tr><th>{head}</th><th>Jumlah</th><th>Terakhir</th></tr></thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.key}><td>{r.key}</td><td>{r.count}</td><td>{fmt(r.last)}</td></tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function AliasInput({ vid, value }) {
+  const [val, setVal] = useState(value || '')
+  const [saved, setSaved] = useState(false)
+  useEffect(() => { setVal(value || '') }, [value])
+  async function commit() {
+    const next = val.trim()
+    if (next === (value || '')) return
+    try { await setAlias(vid, next); setSaved(true); setTimeout(() => setSaved(false), 1200) } catch { /* ignore */ }
+  }
+  return (
+    <input
+      className={`visitor-card__alias ${saved ? 'is-saved' : ''}`}
+      value={val}
+      placeholder="+ alias"
+      aria-label="Alias pengunjung"
+      onChange={(e) => setVal(e.target.value)}
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() } }}
+      onBlur={commit}
+    />
+  )
+}
+
+// ---- Tab: Pengunjung ------------------------------------------------------
+function Visitors() {
+  const { loading, error, data: rep, reload } = useReport(visitorReport)
+
+  // auto-refresh every 10s like the old dashboard
+  useEffect(() => {
+    const id = setInterval(reload, 10000)
+    return () => clearInterval(id)
+  }, [reload])
+
+  async function removeVisitor(vid) {
+    if (!window.confirm('Hapus device ini beserta SEMUA kunjungan & event-nya?')) return
+    try { await deleteVisitor(vid) } catch { /* ignore */ }
+    reload()
+  }
+
+  return (
+    <section className="admin-panel">
+      <div className="admin-panel__head">
+        <h2>👥 Daftar Pengunjung</h2>
+        <p className="admin-note">
+          Pengunjung unik: <strong>{rep?.uniqueVisitors ?? 0}</strong> ·
+          kunjungan: <strong>{rep?.total ?? 0}</strong> ·
+          event: <strong>{rep?.totalEvents ?? 0}</strong> · sumber: {sourceLabel}
+        </p>
+      </div>
+      <Toolbar onReload={reload} />
+      {loading ? <p className="admin-empty">Memuat…</p> : error ? <p className="error-message">{error}</p> : (
+        <>
+          {rep.visitors.length === 0 ? <p className="admin-empty">Belum ada pengunjung.</p> : (
+            <div className="visitor-list">
+              {rep.visitors.map((v, idx) => (
+                <details className="visitor-card" key={v.vid}>
+                  <summary className="visitor-card__head">
+                    <button
+                      className="visitor-card__del"
+                      title="Hapus device & semua data-nya"
+                      aria-label="Hapus device"
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); removeVisitor(v.vid) }}
+                    >🗑️</button>
+                    <span className="visitor-card__id" title={v.vid}>#{idx + 1} · {String(v.vid).slice(0, 12)}</span>
+                    <AliasInput vid={v.vid} value={v.alias} />
+                    <span className="visitor-card__profile">{v.device} · {v.os} · {v.browser}</span>
+                    <span className="visitor-card__src">{v.source}</span>
+                    <span className="visitor-card__count">{v.count}× kunjungan · {v.eventCount} event</span>
+                    <span className="visitor-card__last">{fmt(v.last)}</span>
+                  </summary>
+                  <div className="visitor-card__body">
+                    <div className="visitor-card__grid">
+                      <div>
+                        <h4>📍 Lokasi</h4>
+                        <LocationCell location={v.location} />
+                      </div>
+                      <div>
+                        <h4>ℹ️ Info Device</h4>
+                        <ul className="visitor-card__meta">
+                          <li><strong>Platform:</strong> {v.platform || '—'}</li>
+                          <li><strong>Status:</strong> {v.online == null ? '—' : v.online ? '🟢 Online' : '🔴 Offline'}</li>
+                          <li><strong>Layar:</strong> {v.screen || '—'}</li>
+                          <li><strong>Bahasa:</strong> {v.lang || '—'}</li>
+                          <li><strong>Timezone:</strong> {v.timezone || '—'}</li>
+                          <li><strong>Referrer:</strong> {v.referrer || '—'}</li>
+                          <li><strong>Pertama:</strong> {fmt(v.first)}</li>
+                        </ul>
+                      </div>
+                    </div>
+                    <h4>Aktivitas (halaman + event)</h4>
+                    <div className="table-container">
+                      <table className="user-table">
+                        <thead><tr><th>Aktivitas</th><th>Waktu</th></tr></thead>
+                        <tbody>
+                          {v.activity.map((a, i) => (
+                            <tr key={i}>
+                              <td>
+                                {a.type === 'page'
+                                  ? <><span className="tag tag--page">Halaman</span> {a.label}</>
+                                  : <><span className="tag tag--event">Event</span> {eventLabel(a.name)}{a.target ? ` · ${a.target}` : ''}</>}
+                              </td>
+                              <td>{fmt(a.ts)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </details>
+              ))}
+            </div>
+          )}
+
+          <div className="admin-grid2">
+            <div><h3 className="admin-subhead">Ringkasan Sumber</h3><CountTable head="Source" rows={rep.source} /></div>
+            <div><h3 className="admin-subhead">Ringkasan Device</h3><CountTable head="Device" rows={rep.device} /></div>
+          </div>
+        </>
+      )}
+    </section>
+  )
+}
+
+// ---- Tab: Event Tracker ---------------------------------------------------
+function EventsTab() {
+  const { loading, error, data: rep, reload } = useReport(eventReport)
+  return (
+    <section className="admin-panel">
+      <div className="admin-panel__head">
+        <h2>📈 Event Tracker</h2>
+        <p className="admin-note">
+          Total event: <strong>{rep?.total ?? 0}</strong> · {rep?.groups?.length ?? 0} jenis event · sumber: {sourceLabel}
+        </p>
+      </div>
+      <Toolbar onReload={reload} />
+      {loading ? <p className="admin-empty">Memuat…</p> : error ? <p className="error-message">{error}</p> : (
+        <>
+          {rep.groups.length === 0 ? <p className="admin-empty">Belum ada event tercatat.</p> : (
+            <div className="ev-list">
+              {rep.groups.map((g) => (
+                <details className="ev-card" key={g.name}>
+                  <summary className="ev-card__head">
+                    <span className="ev-card__name">{g.label}</span>
+                    <span className="ev-card__raw">{g.name}</span>
+                    <span className="ev-card__count">{g.count}×</span>
+                    <span className="ev-card__last">{fmt(g.last)}</span>
+                  </summary>
+                  <div className="ev-card__body">
+                    <div className="table-container">
+                      <table className="user-table">
+                        <thead><tr><th>Target</th><th>Jumlah</th><th>Terakhir</th></tr></thead>
+                        <tbody>
+                          {g.targets.map((t) => (
+                            <tr key={t.target}><td>{t.target}</td><td>{t.count}</td><td>{fmt(t.last)}</td></tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </details>
+              ))}
+            </div>
+          )}
+
+          <h3 className="admin-subhead">Event terbaru</h3>
+          {rep.recent.length === 0 ? <p className="admin-empty">—</p> : (
+            <div className="table-container">
+              <table className="user-table">
+                <thead><tr><th>Event</th><th>Target</th><th>Waktu</th></tr></thead>
+                <tbody>
+                  {rep.recent.map((ev, i) => (
+                    <tr key={i}>
+                      <td>{eventLabel(ev.name)}</td>
+                      <td>{ev.meta?.menu || ev.meta?.label || '—'}</td>
+                      <td>{fmt(ev.ts)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  )
+}
+
+function Toolbar({ onReload }) {
+  return (
+    <div className="section-actions" style={{ marginBottom: '1rem' }}>
+      <button className="refresh-button" onClick={onReload}>🔄 Refresh</button>
+      <button
+        className="clear-button"
+        onClick={async () => {
+          if (window.confirm('Hapus semua data kunjungan & event?')) { await clearAnalytics(); onReload() }
+        }}
+      >🗑️ Hapus data</button>
+    </div>
+  )
+}
+
+export default Dashboard

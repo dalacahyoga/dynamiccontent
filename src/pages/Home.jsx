@@ -2,9 +2,6 @@ import React, { useEffect, useState, useRef } from 'react'
 import { trackUserAccess } from '../utils/tracker'
 import { getActiveContent, CONTENT_OPTIONS, getContentTitle, getContentFavicon, syncContentFromCloud } from '../utils/contentManager'
 import { updateFavicon } from '../utils/faviconManager'
-import { isInitialized, initializeBin, initializeContentBin } from '../utils/jsonbinStorage'
-import { autoLoadSharedConfig } from '../utils/sharedConfig'
-import { getConfigApiKey, hasApiKey } from '../config/jsonbin'
 import TimnasContent from '../components/contents/TimnasContent'
 import PulauSeribuContent from '../components/contents/PulauSeribuContent'
 import GunungKawiContent from '../components/contents/GunungKawiContent'
@@ -32,57 +29,12 @@ function Home() {
       trackUserAccess()
       hasTracked.current = true
     }
-    
-    // Auto-load shared config if available (from device A setup)
-    autoLoadSharedConfig()
-    
-    // Auto-initialize JSONBin.io if API key is available in config
-    // Device B, C, dst akan otomatis menggunakan bin IDs dari config
-    const autoSetup = async () => {
-      if (hasApiKey()) {
-        try {
-          const apiKey = getConfigApiKey()
-          if (apiKey) {
-            // Set bin IDs dari config ke localStorage jika belum ada
-            const { getConfigBinIds } = await import('../config/jsonbin')
-            const { getBinId } = await import('../utils/jsonbinStorage')
-            const configBinIds = getConfigBinIds()
-            
-            // Set logs bin ID jika ada di config
-            if (configBinIds.logsBinId && !getBinId()) {
-              localStorage.setItem('jsonbinBinId', configBinIds.logsBinId)
-              localStorage.setItem('jsonbinApiKey', apiKey)
-              console.log('✅ Logs bin ID loaded from config')
-            }
-            
-            // Set content bin ID jika ada di config
-            if (configBinIds.contentBinId && !localStorage.getItem('jsonbinContentBinId')) {
-              localStorage.setItem('jsonbinContentBinId', configBinIds.contentBinId)
-              console.log('✅ Content bin ID loaded from config')
-            }
-            
-            // Jika bin IDs belum ada di config, initialize bins
-            if (!configBinIds.logsBinId || !configBinIds.contentBinId) {
-              await initializeBin(apiKey).catch(err => console.warn('Auto-init logs bin failed:', err))
-              await initializeContentBin(apiKey).catch(err => console.warn('Auto-init content bin failed:', err))
-              console.log('✅ JSONBin.io auto-initialized (created new bins)')
-            } else {
-              console.log('✅ JSONBin.io auto-initialized from config (using existing bins)')
-            }
-          }
-        } catch (error) {
-          console.warn('Auto-setup JSONBin.io failed:', error)
-        }
-      }
-    }
-    
-    autoSetup()
-    
-    // Get active content from localStorage
+
+    // Get active content from cache
     const content = getActiveContent()
     setActiveContent(content)
-    
-    // Always try to sync content from cloud (works even without API key if bin ID exists)
+
+    // Sync the latest active content from Supabase (shared across devices)
     syncContentFromCloud().then(newContent => {
       if (newContent) {
         setActiveContent(newContent)
