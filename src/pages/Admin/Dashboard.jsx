@@ -101,12 +101,8 @@ function EditContent() {
   const [status, setStatus] = useState('')
 
   useEffect(() => {
+    // Sync the current selection from cloud once when the tab opens (no polling).
     syncContentFromCloud().then((c) => { if (c) setActive(c) })
-    const id = setInterval(async () => {
-      const c = await syncContentFromCloud()
-      if (c) setActive(c)
-    }, 5000)
-    return () => clearInterval(id)
   }, [])
 
   const choose = async (contentType) => {
@@ -203,12 +199,6 @@ function AliasInput({ vid, value }) {
 // ---- Tab: Pengunjung ------------------------------------------------------
 function Visitors() {
   const { loading, error, data: rep, reload } = useReport(visitorReport)
-
-  // auto-refresh every 10s like the old dashboard
-  useEffect(() => {
-    const id = setInterval(reload, 10000)
-    return () => clearInterval(id)
-  }, [reload])
 
   async function removeVisitor(vid) {
     if (!window.confirm('Hapus device ini beserta SEMUA kunjungan & event-nya?')) return
