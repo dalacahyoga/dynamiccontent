@@ -818,24 +818,28 @@
   .table-container {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-    margin: 0 -1rem;
-    padding: 0 1rem;
   }
 
+  /* The new admin tables are only 2-3 columns — let them fit the screen and
+     wrap long text instead of forcing a wide scroll. */
   .user-table {
-    font-size: 0.75rem;
-    min-width: 1000px;
+    font-size: 0.78rem;
+    width: 100%;
+    table-layout: fixed;
   }
 
   .user-table th {
-    padding: 0.6rem 0.4rem;
-    font-size: 0.7rem;
-    white-space: nowrap;
+    padding: 0.55rem 0.5rem;
+    font-size: 0.68rem;
+    white-space: normal;
   }
 
   .user-table td {
-    padding: 0.6rem 0.4rem;
-    white-space: nowrap;
+    padding: 0.55rem 0.5rem;
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    vertical-align: top;
   }
 
   .table-cell-content {
@@ -972,3 +976,34 @@
 .ev-card__body { padding: 0 1rem 1rem; border-top: 1px solid #f1f5f9; }
 
 @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* ---- Mobile tweaks for visitor & event cards ---- */
+@media (max-width: 768px) {
+  .visitor-card__head,
+  .ev-card__head {
+    gap: 0.4rem 0.6rem;
+    padding: 0.7rem 0.8rem;
+  }
+  /* let the timestamp drop to its own line instead of being pushed off-screen */
+  .visitor-card__last,
+  .ev-card__last {
+    margin-left: 0;
+    flex-basis: 100%;
+  }
+  .visitor-card__alias { max-width: none; flex: 1 1 120px; }
+  .visitor-card__profile,
+  .visitor-card__count { flex-basis: 100%; }
+  .visitor-card__body { padding: 0 0.8rem 0.8rem; }
+  .ev-card__raw { flex-basis: 100%; }
+
+  .admin-panel__head h2 { font-size: 1.2rem; }
+  .admin-note { font-size: 0.82rem; }
+
+  .warning-banner { flex-direction: column; text-align: center; }
+}
+
+@media (max-width: 480px) {
+  .user-table { font-size: 0.72rem; }
+  .user-table th,
+  .user-table td { padding: 0.45rem 0.4rem; }
+}

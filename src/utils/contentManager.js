@@ -3,13 +3,12 @@
 // `content` table (single row, id = 1, data = { active: '<option>' }), with a
 // localStorage cache so the site renders synchronously before the network call.
 import { supabase, supabaseEnabled } from '../config/supabase'
+import { GAPURA_SVG, RICE_TERRACE_SVG, ISLAND_SVG, PORTAL_SVG } from './faviconManager'
 
 export const CONTENT_OPTIONS = {
   NONE: 'none',
-  TIMNAS: 'timnas',
-  PULAU_SERIBU: 'pulau-seribu',
+  PULAU_PARI: 'pulau-pari',
   GUNUNG_KAWI: 'gunung-kawi',
-  MALAKA_PROJECT: 'malaka-project',
   CEKING_TERRACE: 'ceking-terrace',
   // BOTH option removed - only single content selection allowed
   BOTH: 'both' // Kept for backward compatibility, but not used in UI
@@ -92,24 +91,14 @@ export const isContentActive = (contentType) => {
   return active === contentType
 }
 
-export const shouldShowInNavigation = (contentType) => {
-  const active = getActiveContent()
-  if (active === CONTENT_OPTIONS.NONE) return false
-  return active === contentType
-}
-
 export const getContentLabel = (contentType) => {
   switch (contentType) {
     case CONTENT_OPTIONS.NONE:
       return 'Tidak Ada Konten'
-    case CONTENT_OPTIONS.TIMNAS:
-      return 'Timnas Indonesia'
-    case CONTENT_OPTIONS.PULAU_SERIBU:
-      return 'Pulau Seribu'
+    case CONTENT_OPTIONS.PULAU_PARI:
+      return 'Pulau Pari'
     case CONTENT_OPTIONS.GUNUNG_KAWI:
       return 'Gunung Kawi Sebatu'
-    case CONTENT_OPTIONS.MALAKA_PROJECT:
-      return 'Malaka Project'
     case CONTENT_OPTIONS.CEKING_TERRACE:
       return 'Ceking Terrace'
     case CONTENT_OPTIONS.BOTH:
@@ -125,14 +114,10 @@ export const getContentTitle = (contentType) => {
   switch (contentType) {
     case CONTENT_OPTIONS.NONE:
       return 'Portal Indonesia - Keindahan dan Kebanggaan Nusantara'
-    case CONTENT_OPTIONS.TIMNAS:
-      return 'Timnas Indonesia - Garuda Muda'
-    case CONTENT_OPTIONS.PULAU_SERIBU:
-      return 'Pulau Seribu - Surga Tropis di Utara Jakarta'
+    case CONTENT_OPTIONS.PULAU_PARI:
+      return 'Pulau Pari - Surga Tropis di Kepulauan Seribu'
     case CONTENT_OPTIONS.GUNUNG_KAWI:
       return 'Gunung Kawi Sebatu - Pura Air di Gianyar, Bali'
-    case CONTENT_OPTIONS.MALAKA_PROJECT:
-      return 'Malaka Project - Inovasi dan Pembangunan Berkelanjutan'
     case CONTENT_OPTIONS.CEKING_TERRACE:
       return 'Ceking Terrace - Keindahan Terasering Ubud, Bali'
     case CONTENT_OPTIONS.BOTH:
@@ -146,17 +131,17 @@ export const getContentTitle = (contentType) => {
 export const getContentFavicon = (contentType) => {
   switch (contentType) {
     case CONTENT_OPTIONS.NONE:
-      return '🇮🇩'
-    case CONTENT_OPTIONS.TIMNAS:
-      return '⚽'
-    case CONTENT_OPTIONS.PULAU_SERIBU:
-      return '🏝️'
+      // Nusantara archipelago SVG — transparent tab icon, no background
+      return PORTAL_SVG
+    case CONTENT_OPTIONS.PULAU_PARI:
+      // Tropical island SVG — transparent tab icon, no background
+      return ISLAND_SVG
     case CONTENT_OPTIONS.GUNUNG_KAWI:
-      return '⛰️'
-    case CONTENT_OPTIONS.MALAKA_PROJECT:
-      return '🏗️'
+      // Gapura (candi bentar) SVG — transparent tab icon, no background
+      return GAPURA_SVG
     case CONTENT_OPTIONS.CEKING_TERRACE:
-      return '🌾'
+      // Rice terrace SVG — transparent tab icon, no background
+      return RICE_TERRACE_SVG
     case CONTENT_OPTIONS.BOTH:
       return '🇮🇩'
     default:

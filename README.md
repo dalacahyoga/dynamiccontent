@@ -11,11 +11,9 @@ Website dinamis tentang Indonesia dengan berbagai konten menarik, dibuat dengan 
 - 📝 Dynamic content management (admin panel)
 - 🔄 Dynamic page title & favicon berdasarkan konten
 - 📊 User access tracking + event tracking dengan cloud sync (Supabase)
-- 🌐 Multiple content options:
-  - ⚽ Timnas Indonesia
-  - 🏝️ Pulau Seribu
+- 🌐 Multiple content options (masing-masing landing page mandiri):
+  - 🏝️ Pulau Pari
   - ⛰️ Gunung Kawi Sebatu
-  - 🏗️ Malaka Project
   - 🌾 Ceking Terrace
 
 ## Instalasi
@@ -46,9 +44,7 @@ npm run preview
 
 Website ini menggunakan React Router untuk routing dinamis:
 
-- `/` - Halaman Home (konten dinamis berdasarkan admin setting)
-- `/timnas-indonesia` - Halaman Timnas Indonesia (jika aktif)
-- `/pulau-seribu` - Halaman Pulau Seribu (jika aktif)
+- `/` - Halaman Home (menampilkan konten aktif: Pulau Pari / Gunung Kawi / Ceking, sesuai admin setting)
 - `/admin` - Halaman Login Administrator
 - `/admin/dashboard` - Dashboard Administrator (memerlukan login)
 
@@ -69,7 +65,7 @@ Setelah login, dashboard punya 3 tab:
 
 #### ⚙️ Pengaturan Konten Home
 - Pilih konten yang akan ditampilkan di halaman home
-- Pilihan konten: Timnas Indonesia, Pulau Seribu, Gunung Kawi Sebatu, Malaka Project, Ceking Terrace
+- Pilihan konten: Pulau Pari, Gunung Kawi Sebatu, Ceking Terrace
 - Hanya bisa memilih 1 konten aktif (tersinkron ke semua device via Supabase)
 
 #### 👥 Daftar Pengunjung

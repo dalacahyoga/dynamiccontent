@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { getLocationName, getGoogleMapsLink } from '../utils/geocoding'
+import { getLocationName, getGoogleMapsLink, getGoogleMapsEmbed } from '../utils/geocoding'
 import './LocationCell.css'
 
 function LocationCell({ location }) {
@@ -26,6 +26,7 @@ function LocationCell({ location }) {
   }
 
   const googleMapsLink = getGoogleMapsLink(location.latitude, location.longitude)
+  const mapsEmbed = getGoogleMapsEmbed(location.latitude, location.longitude)
   const lat = location.latitude.toFixed(6)
   const lng = location.longitude.toFixed(6)
 
@@ -40,6 +41,19 @@ function LocationCell({ location }) {
           <span className="table-secondary">Memuat nama lokasi...</span>
         )}
       </div>
+
+      {mapsEmbed && (
+        <div className="location-map">
+          <iframe
+            title={`Peta lokasi ${locationName || `${lat}, ${lng}`}`}
+            src={mapsEmbed}
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+            allowFullScreen
+          />
+        </div>
+      )}
+
       <div className="location-coords">
         <span className="coord-item">
           <strong>Lat:</strong> {lat}

@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  visitorReport, eventReport, eventLabel, setAlias, deleteVisitor, clearAnalytics, trackEvent,
+  visitorReport, eventReport, eventLabel, setAlias, deleteVisitor, clearAnalytics,
 } from '../../utils/tracker'
 import {
   getActiveContent, setActiveContent, CONTENT_OPTIONS, getContentLabel, syncContentFromCloud,
 } from '../../utils/contentManager'
 import { supabase, supabaseEnabled, sourceLabel } from '../../config/supabase'
+import { updateFavicon, ADMIN_SVG } from '../../utils/faviconManager'
 import AdminNav from '../../components/AdminNav'
 import LocationCell from '../../components/LocationCell'
 import './Admin.css'
@@ -15,10 +16,8 @@ const fmt = (ts) => (ts ? new Date(ts).toLocaleString('id-ID') : '—')
 
 const CONTENT_LIST = [
   { id: CONTENT_OPTIONS.NONE, icon: '🚫', title: 'Tidak Ada Konten', desc: 'Halaman home kosong' },
-  { id: CONTENT_OPTIONS.TIMNAS, icon: '⚽', title: 'Timnas Indonesia', desc: 'Konten tentang Timnas Indonesia' },
-  { id: CONTENT_OPTIONS.PULAU_SERIBU, icon: '🏝️', title: 'Pulau Seribu', desc: 'Konten tentang Pulau Seribu' },
+  { id: CONTENT_OPTIONS.PULAU_PARI, icon: '🏝️', title: 'Pulau Pari', desc: 'Surga tropis di Kepulauan Seribu' },
   { id: CONTENT_OPTIONS.GUNUNG_KAWI, icon: '⛰️', title: 'Gunung Kawi Sebatu', desc: 'Pura Air yang Indah di Gianyar, Bali' },
-  { id: CONTENT_OPTIONS.MALAKA_PROJECT, icon: '🏗️', title: 'Malaka Project', desc: 'Inovasi dan Pembangunan Berkelanjutan' },
   { id: CONTENT_OPTIONS.CEKING_TERRACE, icon: '🌾', title: 'Ceking Terrace', desc: 'Keindahan Terasering Sawah di Ubud, Bali' },
 ]
 
@@ -30,6 +29,7 @@ function Dashboard() {
 
   useEffect(() => {
     document.title = 'Administrator Dashboard | Portal Indonesia'
+    updateFavicon(ADMIN_SVG)
 
     if (supabaseEnabled) {
       supabase.auth.getSession().then(({ data }) => {
@@ -114,7 +114,6 @@ function EditContent() {
     if (ok) {
       setActive(contentType)
       window.dispatchEvent(new Event('contentChanged'))
-      trackEvent('content_change', { label: getContentLabel(contentType) })
       setStatus(`✔ Konten aktif: ${getContentLabel(contentType)}` + (supabaseEnabled ? ' (tersinkron ke semua device)' : ' (lokal)'))
     } else {
       setStatus('✖ Gagal mengubah konten')

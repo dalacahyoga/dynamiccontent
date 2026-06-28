@@ -121,3 +121,12 @@ export const getGoogleMapsLink = (latitude, longitude) => {
   return `https://www.google.com/maps?q=${latitude},${longitude}`
 }
 
+// Get an embeddable Google Maps URL (no API key needed via output=embed).
+// t=h → hybrid (satellite imagery + labels). Use t=k for pure satellite.
+export const getGoogleMapsEmbed = (latitude, longitude) => {
+  if (!latitude || !longitude) {
+    return null
+  }
+  return `https://maps.google.com/maps?q=${latitude},${longitude}&z=17&t=h&hl=id&output=embed`
+}
+

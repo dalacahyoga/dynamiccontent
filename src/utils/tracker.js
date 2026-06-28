@@ -69,6 +69,43 @@ function record(meta) {
   lsWrite(PV_KEY, arr)
 }
 
+// Current geolocation permission state: 'granted' | 'prompt' | 'denied' | 'unknown'.
+export async function getLocationPermission() {
+  try {
+    if (!navigator.permissions?.query) return 'unknown'
+    const status = await navigator.permissions.query({ name: 'geolocation' })
+    return status.state
+  } catch {
+    return 'unknown'
+  }
+}
+
+// Ask the browser for the visitor's location and, if granted, record their
+// data with the fresh coordinates. Resolves with the coordinates object
+// { latitude, longitude, accuracy } on success, or null when unavailable/denied.
+// (When permission was previously denied, the browser won't re-prompt.)
+export function captureLocation() {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) { resolve(null); return }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const loc = {
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        }
+        const base = collectVisitor()
+        base.deviceId = base.vid
+        base.deviceName = getDeviceName(base)
+        record({ ...base, location: loc })
+        resolve(loc)
+      },
+      () => resolve(null),
+      { timeout: 8000, enableHighAccuracy: true },
+    )
+  })
+}
+
 export function trackEvent(name, meta) {
   const m = { ...(meta || {}), vid: getVisitorId() } // tie the event to a visitor
   if (supabaseEnabled) {
@@ -145,8 +182,6 @@ export async function setAlias(vid, alias) {
 // ---- page labels -----------------------------------------------------------
 export const PAGE_LABELS = {
   '/': 'Home',
-  '/timnas-indonesia': 'Timnas Indonesia',
-  '/pulau-seribu': 'Pulau Seribu',
 }
 export const pageLabel = (path) => PAGE_LABELS[path] || path
 
@@ -227,8 +262,51 @@ export const EVENT_LABELS = {
   open_maps: 'Buka lokasi di Google Maps',
   view_content: 'Lihat konten',
   open_external: 'Buka link eksternal',
+  // Gunung Kawi Sebatu page
+  gk_nav_home: 'GK · Brand / ke atas',
+  gk_nav_about: 'GK · Menu About',
+  gk_nav_gallery: 'GK · Menu Gallery',
+  gk_nav_toggle: 'GK · Toggle menu mobile',
+  gk_hero_explore: 'GK · Tombol Jelajahi',
+  gk_open_maps: 'GK · Buka Google Maps',
+  gk_load_more: 'GK · Muat lebih banyak',
+  gk_lightbox_close: 'GK · Tutup foto',
+  gk_lightbox_prev: 'GK · Foto sebelumnya',
+  gk_lightbox_next: 'GK · Foto berikutnya',
+  // Ceking Terrace page
+  ck_nav_home: 'CK · Brand / ke atas',
+  ck_nav_about: 'CK · Menu About',
+  ck_nav_gallery: 'CK · Menu Gallery',
+  ck_nav_toggle: 'CK · Toggle menu mobile',
+  ck_hero_explore: 'CK · Tombol Jelajahi',
+  ck_open_maps: 'CK · Buka Google Maps',
+  ck_load_more: 'CK · Muat lebih banyak',
+  ck_lightbox_close: 'CK · Tutup foto',
+  ck_lightbox_prev: 'CK · Foto sebelumnya',
+  ck_lightbox_next: 'CK · Foto berikutnya',
+  // Pulau Pari page
+  pp_nav_home: 'PP · Brand / ke atas',
+  pp_nav_about: 'PP · Menu About',
+  pp_nav_gallery: 'PP · Menu Gallery',
+  pp_nav_toggle: 'PP · Toggle menu mobile',
+  pp_hero_explore: 'PP · Tombol Jelajahi',
+  pp_open_maps: 'PP · Buka Google Maps',
+  pp_load_more: 'PP · Muat lebih banyak',
+  pp_lightbox_close: 'PP · Tutup foto',
+  pp_lightbox_prev: 'PP · Foto sebelumnya',
+  pp_lightbox_next: 'PP · Foto berikutnya',
 }
-export const eventLabel = (name) => EVENT_LABELS[name] || name
+// gk_/ck_/pp_ photo_<NN> events (one per photo) fall back to a label.
+export const eventLabel = (name) => {
+  if (EVENT_LABELS[name]) return EVENT_LABELS[name]
+  let m = /^gk_photo_(\w+)$/.exec(name)
+  if (m) return `GK · Lihat foto #${m[1]}`
+  m = /^ck_photo_(\w+)$/.exec(name)
+  if (m) return `CK · Lihat foto #${m[1]}`
+  m = /^pp_photo_(\w+)$/.exec(name)
+  if (m) return `PP · Lihat foto #${m[1]}`
+  return name
+}
 
 // Grouped event report: per event name with a breakdown of targets, total
 // count, and last time. Sorted by most frequent.

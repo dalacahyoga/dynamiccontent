@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase, supabaseEnabled, usernameToEmail } from '../../config/supabase'
+import { updateFavicon, ADMIN_SVG } from '../../utils/faviconManager'
 import './Admin.css'
 
 // localStorage fallback credentials (used only when Supabase is NOT configured)
@@ -16,6 +17,7 @@ function Login() {
 
   useEffect(() => {
     document.title = 'Administrator Login | Portal Indonesia'
+    updateFavicon(ADMIN_SVG)
 
     // Redirect if already logged in
     if (supabaseEnabled) {
